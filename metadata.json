@@ -1,0 +1,6 @@
+{
+  "name": "Kaminari Nfty",
+  "description": "Native Android client for self-hosted ntfy server with RPLab / Kaminari-Fuji aesthetics.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

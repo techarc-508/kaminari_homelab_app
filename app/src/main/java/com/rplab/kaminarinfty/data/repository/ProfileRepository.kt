@@ -16,6 +16,19 @@ import java.util.UUID
 /** Stable ID of the first profile created by the setup flow. */
 const val PRIMARY_PROFILE_ID = "primary"
 
+/**
+ * Outcome of persisting a profile.
+ *
+ * [credentialError] is non-null when the profile row was written but the secret
+ * could not be stored (e.g. Keystore unavailable). Callers must surface this
+ * instead of pretending the profile is ready to authenticate (G-06).
+ */
+data class ProfileSaveResult(
+    val profileId: String,
+    val credentialStored: Boolean = true,
+    val credentialError: String? = null,
+)
+
 interface ProfileRepository {
     fun observeProfiles(): Flow<List<ServerProfile>>
     fun observeActiveProfileId(): Flow<String?>
@@ -25,12 +38,12 @@ interface ProfileRepository {
     suspend fun loadConfig(profileId: String): ServerConfig?
 
     /** Upserts the existing primary profile (setup "Connect"). */
-    suspend fun saveProfile(config: ServerConfig): String
+    suspend fun saveProfile(config: ServerConfig): ProfileSaveResult
 
     /** Creates an additional profile and returns its generated ID. */
-    suspend fun createProfile(config: ServerConfig, displayName: String = ""): String
+    suspend fun createProfile(config: ServerConfig, displayName: String = ""): ProfileSaveResult
 
-    suspend fun updateProfile(profileId: String, config: ServerConfig)
+    suspend fun updateProfile(profileId: String, config: ServerConfig): ProfileSaveResult
     suspend fun setActiveProfileId(id: String)
     suspend fun deleteProfile(id: String)
 
@@ -83,32 +96,32 @@ class DefaultProfileRepository(
         )
     }
 
-    override suspend fun saveProfile(config: ServerConfig): String {
+    override suspend fun saveProfile(config: ServerConfig): ProfileSaveResult =
         upsertProfile(PRIMARY_PROFILE_ID, config, fallbackName = config.username)
-        return PRIMARY_PROFILE_ID
-    }
 
-    override suspend fun createProfile(config: ServerConfig, displayName: String): String {
+    override suspend fun createProfile(config: ServerConfig, displayName: String): ProfileSaveResult {
         val id = "profile-${UUID.randomUUID()}"
-        upsertProfile(id, config, fallbackName = displayName)
-        return id
+        return upsertProfile(id, config, fallbackName = displayName)
     }
 
-    override suspend fun updateProfile(profileId: String, config: ServerConfig) {
+    override suspend fun updateProfile(profileId: String, config: ServerConfig): ProfileSaveResult =
         upsertProfile(profileId, config, fallbackName = config.username)
-    }
 
     override suspend fun setActiveProfileId(id: String) = preferences.setActiveProfileId(id)
 
     override suspend fun deleteProfile(id: String) {
         profileDao.deleteById(id)
-        secretStore.remove(id)
+        runCatching { secretStore.remove(id) }
         if (preferences.activeProfileId() == id) {
             preferences.clearActiveProfileId()
         }
     }
 
-    private suspend fun upsertProfile(profileId: String, config: ServerConfig, fallbackName: String) {
+    private suspend fun upsertProfile(
+        profileId: String,
+        config: ServerConfig,
+        fallbackName: String,
+    ): ProfileSaveResult {
         val now = System.currentTimeMillis()
         val existing = profileDao.getById(profileId)
         val name = when {
@@ -127,11 +140,39 @@ class DefaultProfileRepository(
                 updatedAt = now,
             )
         )
-        if (config.authMethod == AuthMethod.GUEST || config.tokenOrPassword.isBlank()) {
-            secretStore.remove(profileId)
-        } else {
-            secretStore.put(profileId, config.tokenOrPassword)
+        // Gate finding G-06: a blank credential means "leave the stored secret
+        // alone", never "erase it". Only an explicit guest profile clears it.
+        return when {
+            config.authMethod == AuthMethod.GUEST ->
+                runCatching { secretStore.remove(profileId) }.fold(
+                    onSuccess = { ProfileSaveResult(profileId) },
+                    onFailure = { failure ->
+                        ProfileSaveResult(
+                            profileId,
+                            credentialStored = false,
+                            credentialError = failure.storageMessage(),
+                        )
+                    },
+                )
+            config.tokenOrPassword.isNotBlank() ->
+                runCatching { secretStore.put(profileId, config.tokenOrPassword) }.fold(
+                    onSuccess = { ProfileSaveResult(profileId) },
+                    onFailure = { failure ->
+                        ProfileSaveResult(
+                            profileId,
+                            credentialStored = false,
+                            credentialError = failure.storageMessage(),
+                        )
+                    },
+                )
+            else -> ProfileSaveResult(profileId)
         }
+    }
+
+    /** Torn down to a short, non-secret message the UI can show. */
+    private fun Throwable.storageMessage(): String = when (this) {
+        is IllegalArgumentException -> "Credential is too long to store securely"
+        else -> message?.takeIf { it.isNotBlank() } ?: "Secure credential storage is unavailable"
     }
 
     override suspend fun addTopic(profileId: String, topic: String) {

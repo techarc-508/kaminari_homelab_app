@@ -11,6 +11,7 @@ import com.rplab.kaminarinfty.data.repository.ProfileRepository
 import com.rplab.kaminarinfty.data.repository.StreamRepository
 import com.rplab.kaminarinfty.model.AuthState
 import com.rplab.kaminarinfty.model.NftyErrorCategory
+import com.rplab.kaminarinfty.model.NftyException
 import com.rplab.kaminarinfty.model.NftyMessage
 import com.rplab.kaminarinfty.model.NftyTopic
 import com.rplab.kaminarinfty.model.ServerConfig
@@ -185,8 +186,15 @@ class MainViewModel(
                         messageRepository.delete(profileId, update.messageId)
                     is StreamUpdate.TopicCleared -> {
                         val topic = update.topic
-                        if (topic == null) {
-                            messageRepository.clearHistory(profileId)
+                        if (topic.isNullOrBlank()) {
+                            // Gate finding G-07: an unscoped clear must never delete
+                            // unrelated local history. Ignore it and say so.
+                            _uiState.update {
+                                it.copy(
+                                    bannerMessage =
+                                        "Ignored a topic-less server clear to protect local history",
+                                )
+                            }
                         } else {
                             messageRepository.clearTopic(profileId, topic)
                         }
@@ -328,15 +336,28 @@ class MainViewModel(
             return
         }
         viewModelScope.launch {
-            val ioProfileId = profileRepository.saveProfile(config)
-            profileRepository.setActiveProfileId(ioProfileId)
-            activeProfileId = ioProfileId
+            val result = profileRepository.saveProfile(config)
+            if (result.credentialError != null) {
+                // The profile row is saved, but it cannot authenticate: report the
+                // storage failure instead of activating a broken profile (G-06).
+                _uiState.update {
+                    it.copy(
+                        bannerMessage =
+                            "Profile saved, but the credential could not be stored securely — not activated",
+                        customErrorMessage = result.credentialError,
+                    )
+                }
+                return@launch
+            }
+            profileRepository.setActiveProfileId(result.profileId)
+            activeProfileId = result.profileId
             newestStoredTime = 0L
             activeTopics = emptyList()
             _uiState.update {
                 it.copy(
                     serverConfig = config,
-                    activeProfileId = ioProfileId,
+                    activeProfileId = result.profileId,
+                    customErrorMessage = null,
                     bannerMessage = if (connect) "Profile saved — connecting" else "Profile saved",
                     currentDestination = if (connect) AppDestination.INBOX else it.currentDestination,
                 )
@@ -355,15 +376,26 @@ class MainViewModel(
             return
         }
         viewModelScope.launch {
-            val id = profileRepository.createProfile(config)
-            profileRepository.setActiveProfileId(id)
-            activeProfileId = id
+            val result = profileRepository.createProfile(config)
+            if (result.credentialError != null) {
+                _uiState.update {
+                    it.copy(
+                        bannerMessage =
+                            "New profile saved, but the credential could not be stored securely — not activated",
+                        customErrorMessage = result.credentialError,
+                    )
+                }
+                return@launch
+            }
+            profileRepository.setActiveProfileId(result.profileId)
+            activeProfileId = result.profileId
             activeTopics = emptyList()
             newestStoredTime = 0L
             _uiState.update {
                 it.copy(
                     serverConfig = config,
-                    activeProfileId = id,
+                    activeProfileId = result.profileId,
+                    customErrorMessage = null,
                     currentDestination = AppDestination.INBOX,
                     bannerMessage = "New server profile added",
                 )
@@ -410,11 +442,21 @@ class MainViewModel(
                     }
                 },
                 onFailure = { failure ->
+                    // Gate finding G-05: keep the real cause. Only HTTP 401/403
+                    // mean credentials or permissions; DNS/TLS/timeouts do not.
+                    val category = (failure as? NftyException)?.category
+                        ?: NftyErrorCategory.UNREACHABLE
+                    val state = when (category) {
+                        NftyErrorCategory.AUTH -> AuthState.AUTHENTICATION_FAILED
+                        NftyErrorCategory.FORBIDDEN -> AuthState.PERMISSION_DENIED
+                        else -> AuthState.DISCONNECTED
+                    }
                     _uiState.update {
                         it.copy(
-                            authState = AuthState.AUTHENTICATION_FAILED,
+                            authState = state,
+                            errorCategory = category,
                             customErrorMessage = failure.message,
-                            bannerMessage = "Link check failed: ${failure.message}",
+                            bannerMessage = "Link check failed (${category.label}): ${failure.message}",
                         )
                     }
                 },

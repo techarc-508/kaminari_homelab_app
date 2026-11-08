@@ -25,7 +25,10 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -52,14 +55,24 @@ fun NftyTopBar(
     onToggleThemeClick: (() -> Unit)? = null,
     onSettingsClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
+    // Injectable so the ticking behaviour is testable without wall-clock sleeps.
+    nowMillis: () -> Long = { System.currentTimeMillis() },
 ) {
-    // Static timestamp: no periodic recomposition on low-RAM / E-Ink devices.
-    val currentTimeString = remember {
-        SimpleDateFormat("hh:mm:ss a", Locale.getDefault()).format(Date())
+    // Live clock restored after the phase 2 gate (G-08). A frame callback runs
+    // while this composable is visible, but state only changes once per second
+    // so the low-RAM/E-Ink cost stays at one small recomposition per second.
+    // The coroutine is cancelled automatically when the composition leaves.
+    val clockMillis by produceState(initialValue = nowMillis()) {
+        while (true) {
+            withFrameNanos { }
+            val now = nowMillis()
+            if (now - value >= 1_000L) value = now
+        }
     }
-    val currentDateString = remember {
-        SimpleDateFormat("EEE, MMM d", Locale.getDefault()).format(Date())
-    }
+    val timeFormat = remember { SimpleDateFormat("hh:mm:ss a", Locale.getDefault()) }
+    val dateFormat = remember { SimpleDateFormat("EEE, MMM d", Locale.getDefault()) }
+    val currentTimeString = remember(clockMillis) { timeFormat.format(Date(clockMillis)) }
+    val currentDateString = remember(clockMillis) { dateFormat.format(Date(clockMillis)) }
 
     Box(
         modifier = modifier
@@ -172,6 +185,7 @@ fun NftyTopBar(
                         text = currentTimeString,
                         style = KaminariTheme.techTypography.liveClock,
                         color = KaminariTheme.colors.textPrimary,
+                        modifier = Modifier.testTag("top_bar_clock"),
                     )
                     Text(
                         text = currentDateString,

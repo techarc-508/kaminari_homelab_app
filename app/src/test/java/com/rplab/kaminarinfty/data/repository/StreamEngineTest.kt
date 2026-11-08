@@ -218,6 +218,29 @@ class StreamEngineTest {
     }
 
     @Test
+    fun `a stream that only yields oversized lines stops retrying`() = runTest {
+        val unreadable = listOf(
+            NftyStreamEvent.Connected(AuthState.GUEST, 200),
+            NftyStreamEvent.OversizedLine(512 * 1024),
+        )
+        val api = RecordingApi(List(8) { unreadable })
+        val repo = repository(api, CoroutineScope(SupervisorJob() + StandardTestDispatcher(testScheduler)))
+
+        repo.startSubscription(config, listOf("ops"))
+        runCurrent()
+        repeat(8) {
+            advanceTimeBy(70_000)
+            runCurrent()
+        }
+
+        assertEquals(4, api.sinceValues.size)
+        assertTrue(repo.lastError.value?.second.orEmpty().contains("unreadable"))
+        assertEquals(AuthState.DISCONNECTED, repo.connectionState.value)
+        assertEquals(4, repo.malformedLineCount.value)
+        repo.close()
+    }
+
+    @Test
     fun `stopping the subscription cancels the stream job`() = runTest {
         val api = RecordingApi(listOf(listOf(NftyStreamEvent.Connected(AuthState.GUEST, 200))))
         val repo = repository(api, CoroutineScope(SupervisorJob() + StandardTestDispatcher(testScheduler)))

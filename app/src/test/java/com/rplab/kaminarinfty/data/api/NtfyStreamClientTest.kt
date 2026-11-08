@@ -3,6 +3,7 @@ package com.rplab.kaminarinfty.data.api
 import com.rplab.kaminarinfty.model.AuthMethod
 import com.rplab.kaminarinfty.model.AuthState
 import com.rplab.kaminarinfty.model.NftyErrorCategory
+import com.rplab.kaminarinfty.model.NftyException
 import com.rplab.kaminarinfty.model.ServerConfig
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -251,6 +252,49 @@ class NtfyStreamClientTest {
 
         assertTrue(events.filterIsInstance<NftyStreamEvent.Error>().single().message.contains("Invalid topic"))
         assertEquals(0, server.requestCount)
+    }
+
+    @Test
+    fun `oversized line is reported and skipped so the stream keeps going`() = runBlocking {
+        val huge = "{\"id\":\"big\",\"event\":\"message\",\"topic\":\"ops\",\"message\":\"" +
+            "x".repeat(NtfyEventParser.MAX_LINE_BYTES + 1_024) + "\"}"
+        server.enqueue(
+            MockResponse().setResponseCode(200)
+                .setBody(streamBody(openLine, huge, messageLine))
+        )
+
+        val events = NftyStreamClient().openJsonStream(config(), listOf("ops")).toList()
+
+        assertEquals(1, events.filterIsInstance<NftyStreamEvent.OversizedLine>().size)
+        assertEquals("m1", events.filterIsInstance<NftyStreamEvent.MessageReceived>().single().message.id)
+    }
+
+    @Test
+    fun `probe failures keep their real category`() = runBlocking {
+        server.enqueue(MockResponse().setResponseCode(401))
+        val authFailure = NftyStreamClient().testConnection(config()).exceptionOrNull()
+        assertEquals(NftyErrorCategory.AUTH, (authFailure as NftyException).category)
+
+        server.enqueue(MockResponse().setResponseCode(503))
+        val gatewayFailure = NftyStreamClient().testConnection(config()).exceptionOrNull()
+        assertEquals(NftyErrorCategory.UNREACHABLE, (gatewayFailure as NftyException).category)
+        val unreachableFailure = NftyStreamClient().testConnection(config()).exceptionOrNull()
+        assertEquals(NftyErrorCategory.UNREACHABLE, (gatewayFailure as NftyException).category)
+    }
+
+    @Test
+    fun `unreachable probe is not reported as an authentication failure`() = runBlocking {
+        server.shutdown()
+
+        val failure = NftyStreamClient().testConnection(
+            config(url = "http://127.0.0.1:${server.port}")
+        ).exceptionOrNull()
+
+        assertTrue(failure is NftyException)
+        assertTrue(
+            (failure as NftyException).category == NftyErrorCategory.UNREACHABLE ||
+                (failure as NftyException).category == NftyErrorCategory.TIMEOUT
+        )
     }
 
     @Test

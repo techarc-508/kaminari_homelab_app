@@ -3,6 +3,8 @@ package com.rplab.kaminarinfty
 import com.rplab.kaminarinfty.data.SampleDataProvider
 import com.rplab.kaminarinfty.model.AuthMethod
 import com.rplab.kaminarinfty.model.AuthState
+import com.rplab.kaminarinfty.model.NftyErrorCategory
+import com.rplab.kaminarinfty.model.NftyException
 import com.rplab.kaminarinfty.model.NftyMessage
 import com.rplab.kaminarinfty.model.ServerConfig
 import com.rplab.kaminarinfty.model.StreamUpdate
@@ -16,11 +18,11 @@ import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
-import java.io.IOException
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class MainViewModelTest {
@@ -163,8 +165,10 @@ class MainViewModelTest {
     }
 
     @Test
-    fun `failed connection test surfaces AUTHENTICATION_FAILED`() = runTest(mainRule.dispatcher) {
-        stream.testResult = Result.failure(IOException("HTTP 401: invalid credentials"))
+    fun `HTTP 401 probe failure surfaces AUTHENTICATION_FAILED`() = runTest(mainRule.dispatcher) {
+        stream.testResult = Result.failure(
+            NftyException(NftyErrorCategory.AUTH, "HTTP 401: invalid credentials")
+        )
         val vm = buildViewModel()
         advanceUntilIdle()
 
@@ -172,7 +176,39 @@ class MainViewModelTest {
         advanceUntilIdle()
 
         assertEquals(AuthState.AUTHENTICATION_FAILED, vm.uiState.value.authState)
-        assertTrue(vm.uiState.value.bannerMessage.orEmpty().contains("failed"))
+        assertEquals(NftyErrorCategory.AUTH, vm.uiState.value.errorCategory)
+        assertTrue(vm.uiState.value.bannerMessage.orEmpty().contains("HTTP 401"))
+    }
+
+    @Test
+    fun `DNS probe failure is not reported as an authentication failure`() = runTest(mainRule.dispatcher) {
+        stream.testResult = Result.failure(
+            NftyException(NftyErrorCategory.DNS, "DNS resolution failed for server host")
+        )
+        val vm = buildViewModel()
+        advanceUntilIdle()
+
+        vm.testConnection(ServerConfig(serverUrl = "https://ntfy.test"))
+        advanceUntilIdle()
+
+        assertEquals(AuthState.DISCONNECTED, vm.uiState.value.authState)
+        assertEquals(NftyErrorCategory.DNS, vm.uiState.value.errorCategory)
+        assertTrue(vm.uiState.value.bannerMessage.orEmpty().contains("DNS"))
+    }
+
+    @Test
+    fun `TLS probe failure keeps the TLS category`() = runTest(mainRule.dispatcher) {
+        stream.testResult = Result.failure(
+            NftyException(NftyErrorCategory.TLS, "TLS handshake failed (certificate verification)")
+        )
+        val vm = buildViewModel()
+        advanceUntilIdle()
+
+        vm.testConnection(ServerConfig(serverUrl = "https://ntfy.test"))
+        advanceUntilIdle()
+
+        assertEquals(AuthState.DISCONNECTED, vm.uiState.value.authState)
+        assertEquals(NftyErrorCategory.TLS, vm.uiState.value.errorCategory)
     }
 
     @Test
@@ -277,4 +313,46 @@ class MainViewModelTest {
         assertEquals("profile-test", preferences.state.value.activeProfileId)
         assertEquals("profile-test", vm.uiState.value.activeProfileId)
     }
+
+    @Test
+    fun `a topic-less server clear never wipes local history`() = runTest(mainRule.dispatcher) {
+        preferences.state.value = preferences.state.value.copy(activeProfileId = "primary")
+        profiles.config = ServerConfig(serverUrl = "https://ntfy.test", authMethod = AuthMethod.GUEST)
+        val vm = buildViewModel()
+        advanceUntilIdle()
+
+        stream.emitUpdate(StreamUpdate.TopicCleared(null))
+        advanceUntilIdle()
+
+        assertEquals(0, messages.clearHistoryCalls)
+        assertTrue(messages.clearedTopics.isEmpty())
+        assertTrue(vm.uiState.value.bannerMessage.orEmpty().contains("topic-less"))
+    }
+
+    @Test
+    fun `a credential storage failure is surfaced and the profile is not activated`() =
+        runTest(mainRule.dispatcher) {
+            profiles.credentialError = "Secure credential storage is unavailable"
+            profiles.subscribedNames = listOf("ops")
+            val vm = buildViewModel()
+            advanceUntilIdle()
+
+            vm.saveConfig(
+                ServerConfig(
+                    serverUrl = "https://nfty.example.test",
+                    authMethod = AuthMethod.ACCESS_TOKEN,
+                    tokenOrPassword = "tk_secret",
+                ),
+                connect = true,
+            )
+            advanceUntilIdle()
+
+            assertNull(preferences.state.value.activeProfileId)
+            assertTrue(stream.startCalls.isEmpty())
+            assertTrue(vm.uiState.value.bannerMessage.orEmpty().contains("credential"))
+            assertEquals(
+                "Secure credential storage is unavailable",
+                vm.uiState.value.customErrorMessage,
+            )
+        }
 }

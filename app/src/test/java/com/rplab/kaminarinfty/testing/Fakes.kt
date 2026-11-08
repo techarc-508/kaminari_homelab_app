@@ -5,6 +5,7 @@ import com.rplab.kaminarinfty.data.preferences.AppPreferencesData
 import com.rplab.kaminarinfty.data.repository.CatchUpOutcome
 import com.rplab.kaminarinfty.data.repository.MessageRepository
 import com.rplab.kaminarinfty.data.repository.ProfileRepository
+import com.rplab.kaminarinfty.data.repository.ProfileSaveResult
 import com.rplab.kaminarinfty.data.repository.StreamRepository
 import com.rplab.kaminarinfty.ThemeSetting
 import com.rplab.kaminarinfty.model.AuthMethod
@@ -124,6 +125,9 @@ class FakeProfileRepository : ProfileRepository {
     var activeId: String? = null
     var onSetActive: (String) -> Unit = {}
 
+    /** Simulates an unavailable Keystore when non-null. */
+    var credentialError: String? = null
+
     override fun observeProfiles(): Flow<List<ServerProfile>> = profilesFlow
 
     override fun observeActiveProfileId(): Flow<String?> = MutableStateFlow(activeId)
@@ -134,7 +138,7 @@ class FakeProfileRepository : ProfileRepository {
 
     override suspend fun loadConfig(profileId: String): ServerConfig? = config
 
-    override suspend fun saveProfile(config: ServerConfig): String {
+    override suspend fun saveProfile(config: ServerConfig): ProfileSaveResult {
         this.config = config
         profilesFlow.update { existing ->
             existing.filterNot { it.id == "primary" } + ServerProfile(
@@ -147,10 +151,14 @@ class FakeProfileRepository : ProfileRepository {
                 updatedAt = 0L,
             )
         }
-        return "primary"
+        return ProfileSaveResult(
+            profileId = "primary",
+            credentialStored = credentialError == null,
+            credentialError = credentialError,
+        )
     }
 
-    override suspend fun createProfile(config: ServerConfig, displayName: String): String {
+    override suspend fun createProfile(config: ServerConfig, displayName: String): ProfileSaveResult {
         this.config = config
         val id = "profile-test"
         profilesFlow.update { existing ->
@@ -164,11 +172,20 @@ class FakeProfileRepository : ProfileRepository {
                 updatedAt = 0L,
             )
         }
-        return id
+        return ProfileSaveResult(
+            profileId = id,
+            credentialStored = credentialError == null,
+            credentialError = credentialError,
+        )
     }
 
-    override suspend fun updateProfile(profileId: String, config: ServerConfig) {
+    override suspend fun updateProfile(profileId: String, config: ServerConfig): ProfileSaveResult {
         this.config = config
+        return ProfileSaveResult(
+            profileId = profileId,
+            credentialStored = credentialError == null,
+            credentialError = credentialError,
+        )
     }
 
     override suspend fun setActiveProfileId(id: String) {

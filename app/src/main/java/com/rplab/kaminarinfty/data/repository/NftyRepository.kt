@@ -118,6 +118,9 @@ class NftyRepository(
         streamJob = scope.launch {
             var attempt = 0
             var terminal = false
+            // Attempts that produced only unreadable data. Bounded so a poison
+            // stream cannot reconnect forever (gate finding G-04).
+            var unproductiveAttempts = 0
 
             while (isActive && !terminal) {
                 _connectionState.value = if (attempt == 0) AuthState.CONNECTING else AuthState.RECONNECTING
@@ -130,6 +133,8 @@ class NftyRepository(
                 }
 
                 var streamOpened = false
+                var sawUnreadableData = false
+                var sawUsableData = false
                 try {
                     client.openJsonStream(config, activeTopics, since = since).collect { event ->
                         when (event) {
@@ -141,16 +146,28 @@ class NftyRepository(
                                 _lastError.value = null
                             }
                             is NftyStreamEvent.MessageReceived -> {
+                                sawUsableData = true
                                 if (markSeen(event.message.id)) {
                                     _updates.emit(StreamUpdate.NewMessage(event.message))
                                 }
                             }
-                            is NftyStreamEvent.MessageDeleted ->
+                            is NftyStreamEvent.MessageDeleted -> {
+                                sawUsableData = true
                                 _updates.emit(StreamUpdate.Removed(event.messageId))
-                            is NftyStreamEvent.TopicCleared ->
+                            }
+                            is NftyStreamEvent.TopicCleared -> {
+                                sawUsableData = true
                                 _updates.emit(StreamUpdate.TopicCleared(event.topic))
+                            }
                             is NftyStreamEvent.KeepAlive -> Unit
-                            is NftyStreamEvent.Malformed -> _malformedLineCount.value += 1
+                            is NftyStreamEvent.OversizedLine -> {
+                                _malformedLineCount.value += 1
+                                sawUnreadableData = true
+                            }
+                            is NftyStreamEvent.Malformed -> {
+                                _malformedLineCount.value += 1
+                                sawUnreadableData = true
+                            }
                             is NftyStreamEvent.Error -> {
                                 _lastError.value = Pair(event.category, event.message)
                                 if (!event.canRetry) {
@@ -191,6 +208,20 @@ class NftyRepository(
 
                 if (!isActive || terminal) break
 
+                if (sawUnreadableData && !sawUsableData) {
+                    unproductiveAttempts++
+                    if (unproductiveAttempts >= MAX_UNPRODUCTIVE_ATTEMPTS) {
+                        _lastError.value = Pair(
+                            NftyErrorCategory.STREAM,
+                            "Server keeps sending unreadable stream data — stopped retrying",
+                        )
+                        _connectionState.value = AuthState.DISCONNECTED
+                        break
+                    }
+                } else {
+                    unproductiveAttempts = 0
+                }
+
                 attempt++
                 _reconnectAttempt.value = attempt
                 _connectionState.value = AuthState.RECONNECTING
@@ -226,6 +257,7 @@ class NftyRepository(
                         _updates.emit(StreamUpdate.Removed(event.messageId))
                     is NftyStreamEvent.TopicCleared ->
                         _updates.emit(StreamUpdate.TopicCleared(event.topic))
+                    is NftyStreamEvent.OversizedLine -> _malformedLineCount.value += 1
                     is NftyStreamEvent.Malformed -> _malformedLineCount.value += 1
                     is NftyStreamEvent.Error -> {
                         failed = true
@@ -270,6 +302,7 @@ class NftyRepository(
 
     private companion object {
         const val MAX_RECENT_IDS = 512
+        const val MAX_UNPRODUCTIVE_ATTEMPTS = 4
     }
 }
 

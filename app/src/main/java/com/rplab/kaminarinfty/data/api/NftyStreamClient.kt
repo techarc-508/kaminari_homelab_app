@@ -3,6 +3,7 @@ package com.rplab.kaminarinfty.data.api
 import com.rplab.kaminarinfty.model.AuthMethod
 import com.rplab.kaminarinfty.model.AuthState
 import com.rplab.kaminarinfty.model.NftyErrorCategory
+import com.rplab.kaminarinfty.model.NftyException
 import com.rplab.kaminarinfty.model.NftyMessage
 import com.rplab.kaminarinfty.model.ServerConfig
 import com.rplab.kaminarinfty.model.usesCredentials
@@ -18,6 +19,7 @@ import okhttp3.Credentials
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.Response
+import okio.BufferedSource
 import org.json.JSONObject
 import java.io.EOFException
 import java.io.IOException
@@ -33,6 +35,12 @@ sealed class NftyStreamEvent {
     data class MessageDeleted(val messageId: String, val topic: String?) : NftyStreamEvent()
     data class TopicCleared(val topic: String?) : NftyStreamEvent()
     data class KeepAlive(val timestamp: Long) : NftyStreamEvent()
+
+    /**
+     * A line exceeded the stream line limit and was discarded, but the
+     * connection was kept and reading continues on the next line (G-04).
+     */
+    data class OversizedLine(val limitBytes: Int) : NftyStreamEvent()
 
     /** A stream line that is not valid JSON or lacks required message fields. */
     data class Malformed(val reason: String) : NftyStreamEvent()
@@ -73,7 +81,14 @@ class NftyStreamClient(
 
     override fun testConnection(config: ServerConfig): Result<AuthState> {
         val healthUrl = NtfyEndpoint.healthUrl(config.serverUrl, config.useHttpsOnly)
-            .getOrElse { return Result.failure(it) }
+            .getOrElse {
+                return Result.failure(
+                    NftyException(
+                        NftyErrorCategory.UNREACHABLE,
+                        it.message ?: "Invalid server URL",
+                    )
+                )
+            }
 
         val requestBuilder = Request.Builder()
             .url(healthUrl)
@@ -88,27 +103,54 @@ class NftyStreamClient(
                         if (responseBodyHealthy(response)) {
                             Result.success(reachableAuthState(config))
                         } else {
-                            Result.failure(IOException("Server reports unhealthy status"))
+                            Result.failure(
+                                NftyException(
+                                    NftyErrorCategory.STREAM,
+                                    "Server reports unhealthy status",
+                                )
+                            )
                         }
                     }
                     // /v1/health may be disabled behind a reverse proxy; try the root.
                     404 -> testRootEndpoint(config)
-                    401 -> Result.failure(IOException("HTTP 401: credentials rejected by server"))
-                    403 -> Result.failure(IOException("HTTP 403: server policy denied access"))
-                    502, 503, 504 -> Result.failure(
-                        IOException("HTTP ${response.code}: server gateway is unavailable")
+                    401 -> Result.failure(
+                        NftyException(NftyErrorCategory.AUTH, "HTTP 401: credentials rejected by server")
                     )
-                    else -> Result.failure(IOException("Server returned HTTP ${response.code}"))
+                    403 -> Result.failure(
+                        NftyException(NftyErrorCategory.FORBIDDEN, "HTTP 403: server policy denied access")
+                    )
+                    502, 503, 504 -> Result.failure(
+                        NftyException(
+                            NftyErrorCategory.UNREACHABLE,
+                            "HTTP ${response.code}: server gateway is unavailable",
+                        )
+                    )
+                    in 500..599 -> Result.failure(
+                        NftyException(NftyErrorCategory.STREAM, "HTTP ${response.code}: server error")
+                    )
+                    else -> Result.failure(
+                        NftyException(
+                            NftyErrorCategory.UNREACHABLE,
+                            "Server returned HTTP ${response.code}",
+                        )
+                    )
                 }
             }
         } catch (e: Exception) {
-            Result.failure(mapException(e).second)
+            Result.failure(e.toNftyException())
         }
     }
 
     private fun testRootEndpoint(config: ServerConfig): Result<AuthState> {
         val rootUrl = NtfyEndpoint.rootUrl(config.serverUrl, config.useHttpsOnly)
-            .getOrElse { return Result.failure(it) }
+            .getOrElse {
+                return Result.failure(
+                    NftyException(
+                        NftyErrorCategory.UNREACHABLE,
+                        it.message ?: "Invalid server URL",
+                    )
+                )
+            }
 
         val requestBuilder = Request.Builder()
             .url(rootUrl)
@@ -121,11 +163,16 @@ class NftyStreamClient(
                 if (response.isSuccessful || response.code == 301 || response.code == 302) {
                     Result.success(reachableAuthState(config))
                 } else {
-                    Result.failure(IOException("Server returned HTTP ${response.code}"))
+                    Result.failure(
+                        NftyException(
+                            NftyErrorCategory.UNREACHABLE,
+                            "Server returned HTTP ${response.code}",
+                        )
+                    )
                 }
             }
         } catch (e: Exception) {
-            Result.failure(mapException(e).second)
+            Result.failure(e.toNftyException())
         }
     }
 
@@ -212,24 +259,63 @@ class NftyStreamClient(
     ) {
         val body = response.body ?: throw IOException("Empty response body from ntfy")
         val source = body.source()
+        val limit = NtfyEventParser.MAX_LINE_BYTES.toLong()
 
         while (currentCoroutineContext().isActive) {
             val line = try {
-                source.readUtf8LineStrict(NtfyEventParser.MAX_LINE_BYTES.toLong())
+                source.readUtf8LineStrict(limit)
             } catch (_: EOFException) {
-                break
-            } catch (e: IOException) {
-                // Oversized line: report it, then let the reconnect loop resync.
-                if (e.message?.contains("exceed", ignoreCase = true) == true) {
-                    emit(NftyStreamEvent.Malformed("stream line exceeds ${NtfyEventParser.MAX_LINE_BYTES} bytes"))
-                    break
+                // Okio raises EOFException both at a real end of stream and when
+                // no newline appears within `limit`. Only the over-limit case
+                // leaves more than `limit` bytes buffered, so that is the signal
+                // (gate finding G-04).
+                if (source.buffer.size > limit) {
+                    emit(NftyStreamEvent.OversizedLine(NtfyEventParser.MAX_LINE_BYTES))
+                    if (!discardOversizedLine(source)) {
+                        emit(
+                            NftyStreamEvent.Malformed(
+                                "oversized stream line exceeded the $MAX_DISCARD_BYTES byte discard limit"
+                            )
+                        )
+                        break
+                    }
+                    continue
                 }
-                throw e
+                break
             }
 
             if (line.isBlank()) continue
             emit(parseLine(line))
         }
+    }
+
+    /**
+     * Consumes the rest of a line that was too long to return, so the next read
+     * starts at the following line instead of the same one. Returns false when
+     * the stream ends or the line is absurdly large, because reconnecting would
+     * only replay the same unreadable data.
+     */
+    private fun discardOversizedLine(source: BufferedSource): Boolean {
+        var discarded = 0L
+        while (discarded < MAX_DISCARD_BYTES) {
+            val buffered = source.buffer.size
+            if (buffered > 0) {
+                val newline = source.buffer.indexOf(NEWLINE, 0L, buffered)
+                if (newline >= 0L) {
+                    source.buffer.skip(newline + 1L)
+                    return true
+                }
+                source.buffer.skip(buffered)
+                discarded += buffered
+            }
+            if (!source.request(1)) return false
+        }
+        return false
+    }
+
+    private fun Exception.toNftyException(): NftyException {
+        val (category, mapped) = mapException(this)
+        return NftyException(category, mapped.message ?: "Connection failure")
     }
 
     private fun parseLine(line: String): NftyStreamEvent = when (val result = NtfyEventParser.parse(line)) {
@@ -354,6 +440,10 @@ class NftyStreamClient(
 
     private companion object {
         private const val USER_AGENT = "KaminariNfty-Android/1.0.0"
+
+        /** Upper bound on bytes skipped while discarding one oversized line. */
+        private const val MAX_DISCARD_BYTES = 8L * 1024 * 1024
+        private val NEWLINE: Byte = '\n'.code.toByte()
 
         private fun streamClient(): OkHttpClient = OkHttpClient.Builder()
             .connectTimeout(15, TimeUnit.SECONDS)

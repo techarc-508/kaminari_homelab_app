@@ -1,4 +1,4 @@
-package com.example
+package com.rplab.kaminarinfty
 
 import org.junit.Assert.*
 import org.junit.Test

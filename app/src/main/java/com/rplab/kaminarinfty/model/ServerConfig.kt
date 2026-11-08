@@ -9,8 +9,13 @@ enum class AuthMethod(val displayName: String) {
 enum class AuthState(val statusLabel: String, val isConnected: Boolean) {
     NOT_CONFIGURED("NOT CONFIGURED", false),
     CONNECTING("CONNECTING...", false),
-    AUTHENTICATED("SUPERUSER", true),
+
+    /** Credentials accepted by the server for the subscribed topics. */
+    AUTHENTICATED("AUTHENTICATED", true),
     GUEST("GUEST SESSION", true),
+
+    /** Endpoint answered, but no credential was proven (health is public). */
+    REACHABLE("REACHABLE — AUTH UNVERIFIED", true),
     AUTHENTICATION_FAILED("AUTH FAILED", false),
     PERMISSION_DENIED("PERMISSION DENIED", false),
     DISCONNECTED("OFFLINE", false),
@@ -23,5 +28,12 @@ data class ServerConfig(
     val username: String = "",
     val tokenOrPassword: String = "",
     val useHttpsOnly: Boolean = true,
-    val autoReconnect: Boolean = true,
-)
+) {
+    /** A secret is present for a method that needs one. */
+    fun hasCredentials(): Boolean = tokenOrPassword.isNotBlank()
+
+    /** True when the selected auth method requires a credential. */
+    fun requiresCredentials(): Boolean = authMethod.usesCredentials()
+}
+
+fun AuthMethod.usesCredentials(): Boolean = this != AuthMethod.GUEST

@@ -40,7 +40,8 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
-            val mainViewModel: MainViewModel = viewModel()
+            val container = (application as KaminariApp).container
+            val mainViewModel: MainViewModel = viewModel(factory = MainViewModelFactory(container))
             val uiState by mainViewModel.uiState.collectAsStateWithLifecycle()
 
             val isDarkTheme = when (uiState.themeSetting) {
@@ -108,26 +109,26 @@ fun KaminariApp(
                     SetupScreen(
                         serverConfig = uiState.serverConfig,
                         authState = uiState.authState,
-                        onSaveConfig = { viewModel.updateServerConfig(it) },
-                        onTestConnection = { viewModel.testServerConnection() },
-                        onProceed = { viewModel.navigateTo(AppDestination.INBOX) },
+                        onSaveConfig = { viewModel.saveConfig(it, connect = true) },
+                        onSaveAsNewProfile = { viewModel.addServerProfile(it) },
+                        hasExistingProfile = uiState.activeProfileId != null,
+                        onTestConnection = { viewModel.testConnection(it) },
                     )
                 }
 
                 AppDestination.INBOX -> {
                     InboxScreen(
                         messages = uiState.messages,
+                        serverUrl = uiState.serverConfig.serverUrl,
                         authState = uiState.authState,
                         activeFilter = uiState.activeFilter,
                         selectedTopicFilter = uiState.selectedTopicFilter,
-                        simulationState = uiState.simulationState,
                         isSampleData = uiState.isSampleData,
                         isCompactDensity = uiState.isCompactDensity,
                         errorCategory = uiState.errorCategory,
                         customErrorMessage = uiState.customErrorMessage,
                         onFilterChange = { viewModel.setFilter(it) },
                         onClearTopicFilter = { viewModel.setTopicFilter(null) },
-                        onSimulationChange = { viewModel.setSimulationState(it) },
                         onRetryStream = { viewModel.retryLiveStream() },
                         onMessageClick = { viewModel.openMessageDetail(it) },
                         onToggleSave = { viewModel.toggleSaveMessage(it) },
@@ -209,16 +210,25 @@ fun KaminariApp(
                     SettingsScreen(
                         serverConfig = uiState.serverConfig,
                         authState = uiState.authState,
+                        profiles = uiState.profiles,
+                        activeProfileId = uiState.activeProfileId,
+                        reconnectAttempt = uiState.reconnectAttempt,
+                        lastCursor = uiState.lastCursor,
                         themeSetting = uiState.themeSetting,
                         isCompactDensity = uiState.isCompactDensity,
                         isSampleData = uiState.isSampleData,
+                        sampleDataEnabled = uiState.sampleDataEnabled,
+                        historyCount = uiState.messages.size,
+                        malformedLines = uiState.malformedLines,
                         onThemeChange = { viewModel.setThemeSetting(it) },
                         onToggleDensity = { viewModel.toggleDensity() },
-                        onTestConnection = { viewModel.testServerConnection() },
+                        onTestConnection = { viewModel.testConnection(uiState.serverConfig) },
+                        onSelectProfile = { viewModel.switchProfile(it) },
+                        onCatchUp = { viewModel.retryLiveStream() },
                         onNavigateToSetup = { viewModel.navigateTo(AppDestination.SETUP) },
                         onClearHistory = { viewModel.clearHistory() },
                         onClearSaved = { viewModel.clearSaved() },
-                        onResetSampleData = { viewModel.resetSampleData() },
+                        onToggleSampleData = { viewModel.setSampleDataEnabled(it) },
                         onSearchClick = { viewModel.navigateTo(AppDestination.SEARCH) },
                     )
                 }

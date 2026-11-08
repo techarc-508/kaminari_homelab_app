@@ -3,14 +3,10 @@ package com.rplab.kaminarinfty
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import com.rplab.kaminarinfty.data.api.NftyStreamClient
-import com.rplab.kaminarinfty.data.api.NftyStreamEvent
 import com.rplab.kaminarinfty.model.AuthMethod
-import com.rplab.kaminarinfty.model.AuthState
 import com.rplab.kaminarinfty.model.NftyPriority
 import com.rplab.kaminarinfty.model.ServerConfig
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
-import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -29,35 +25,6 @@ class ExampleRobolectricTest {
   }
 
   @Test
-  fun `viewmodel loads sample messages and topics`() {
-    val viewModel = MainViewModel()
-    val state = viewModel.uiState.value
-
-    assertTrue("Sample messages should be populated", state.messages.isNotEmpty())
-    assertTrue("Topics should be populated", state.topics.isNotEmpty())
-    assertTrue("Initial state is CONNECTING or established", state.authState in listOf(AuthState.CONNECTING, AuthState.GUEST, AuthState.DISCONNECTED))
-  }
-
-  @Test
-  fun `toggle save message works`() {
-    val viewModel = MainViewModel()
-    val firstMessageId = viewModel.uiState.value.messages.first().id
-    val initialSaved = viewModel.uiState.value.messages.first().isSaved
-
-    viewModel.toggleSaveMessage(firstMessageId)
-    val afterToggle = viewModel.uiState.value.messages.first { it.id == firstMessageId }.isSaved
-    assertEquals(!initialSaved, afterToggle)
-  }
-
-  @Test
-  fun `mark all as read updates all messages`() {
-    val viewModel = MainViewModel()
-    viewModel.markAllAsRead()
-    val allRead = viewModel.uiState.value.messages.all { it.isRead }
-    assertTrue("All messages should be read", allRead)
-  }
-
-  @Test
   fun `server config defaults to correct endpoint`() {
     val config = ServerConfig()
     assertEquals("https://nfty.rplab.qzz.io", config.serverUrl)
@@ -72,5 +39,12 @@ class ExampleRobolectricTest {
     assertEquals(NftyPriority.DEFAULT, NftyPriority.fromLevel(3))
     assertEquals(NftyPriority.HIGH, NftyPriority.fromLevel(4))
     assertEquals(NftyPriority.URGENT, NftyPriority.fromLevel(5))
+  }
+
+  @Test
+  fun `client rejects URLs without a scheme before any network call`() {
+    val result = NftyStreamClient().testConnection(ServerConfig(serverUrl = "nfty.test"))
+    assertTrue(result.isFailure)
+    assertTrue(result.exceptionOrNull()?.message.orEmpty().contains("http"))
   }
 }

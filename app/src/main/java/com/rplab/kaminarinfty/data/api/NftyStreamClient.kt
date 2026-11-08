@@ -1,24 +1,25 @@
 package com.rplab.kaminarinfty.data.api
 
-import android.util.Base64
 import com.rplab.kaminarinfty.model.AuthMethod
 import com.rplab.kaminarinfty.model.AuthState
-import com.rplab.kaminarinfty.model.NftyAction
-import com.rplab.kaminarinfty.model.NftyAttachment
 import com.rplab.kaminarinfty.model.NftyErrorCategory
 import com.rplab.kaminarinfty.model.NftyMessage
-import com.rplab.kaminarinfty.model.NftyPriority
 import com.rplab.kaminarinfty.model.ServerConfig
+import com.rplab.kaminarinfty.model.usesCredentials
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
 import okhttp3.Credentials
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.Response
-import org.json.JSONArray
 import org.json.JSONObject
+import java.io.EOFException
 import java.io.IOException
 import java.net.ConnectException
 import java.net.SocketTimeoutException
@@ -29,54 +30,74 @@ import javax.net.ssl.SSLException
 sealed class NftyStreamEvent {
     data class Connected(val authState: AuthState, val httpCode: Int) : NftyStreamEvent()
     data class MessageReceived(val message: NftyMessage) : NftyStreamEvent()
+    data class MessageDeleted(val messageId: String, val topic: String?) : NftyStreamEvent()
+    data class TopicCleared(val topic: String?) : NftyStreamEvent()
     data class KeepAlive(val timestamp: Long) : NftyStreamEvent()
-    data class Error(val category: NftyErrorCategory, val message: String, val canRetry: Boolean) : NftyStreamEvent()
+
+    /** A stream line that is not valid JSON or lacks required message fields. */
+    data class Malformed(val reason: String) : NftyStreamEvent()
+    data class Error(
+        val category: NftyErrorCategory,
+        val message: String,
+        val canRetry: Boolean,
+    ) : NftyStreamEvent()
+}
+
+/** Narrow API surface so the reconnect engine is unit-testable with a fake. */
+interface NtfyApi {
+    fun testConnection(config: ServerConfig): Result<AuthState>
+
+    /**
+     * Subscribes to the documented ntfy JSON stream.
+     *
+     * @param since ntfy history cursor: `all`, `30m`, a Unix timestamp or a message ID.
+     * @param poll when true requests `poll=1`, a bounded catch-up stream that ends.
+     */
+    fun openJsonStream(
+        config: ServerConfig,
+        topics: List<String>,
+        since: String = NtfyEndpoint.DEFAULT_SINCE,
+        poll: Boolean = false,
+    ): Flow<NftyStreamEvent>
 }
 
 class NftyStreamClient(
-    private val client: OkHttpClient = OkHttpClient.Builder()
-        .connectTimeout(15, TimeUnit.SECONDS)
-        .readTimeout(0, TimeUnit.SECONDS) // Read timeout 0 for long-lived SSE streaming
-        .writeTimeout(15, TimeUnit.SECONDS)
-        .retryOnConnectionFailure(false)
+    private val client: OkHttpClient = streamClient(),
+) : NtfyApi {
+
+    /** Short-lived client for health checks: a hung probe must not hang for minutes. */
+    private val healthClient: OkHttpClient = client.newBuilder()
+        .readTimeout(10, TimeUnit.SECONDS)
+        .callTimeout(20, TimeUnit.SECONDS)
         .build()
-) {
 
-    /**
-     * Checks server reachability and credentials against endpoint using a short poll request.
-     */
-    fun testConnection(config: ServerConfig): Result<AuthState> {
-        val baseUrl = config.serverUrl.trim().trimEnd('/')
-        if (!baseUrl.startsWith("https://", ignoreCase = true) && !baseUrl.startsWith("http://", ignoreCase = true)) {
-            return Result.failure(IllegalArgumentException("Server URL must include https://"))
-        }
+    override fun testConnection(config: ServerConfig): Result<AuthState> {
+        val healthUrl = NtfyEndpoint.healthUrl(config.serverUrl, config.useHttpsOnly)
+            .getOrElse { return Result.failure(it) }
 
-        // Test with a lightweight query to verify status
-        val testUrl = "$baseUrl/v1/health" // Standard ntfy health endpoint or root
         val requestBuilder = Request.Builder()
-            .url(testUrl)
+            .url(healthUrl)
             .get()
-            .header("User-Agent", "KaminariNfty-Android/1.0.0")
-
+            .header("User-Agent", USER_AGENT)
         applyAuthHeaders(requestBuilder, config)
 
         return try {
-            client.newCall(requestBuilder.build()).execute().use { response ->
+            healthClient.newCall(requestBuilder.build()).execute().use { response ->
                 when (response.code) {
                     200, 204 -> {
-                        val authState = when (config.authMethod) {
-                            AuthMethod.GUEST -> AuthState.GUEST
-                            AuthMethod.USERNAME_PASSWORD, AuthMethod.ACCESS_TOKEN ->
-                                if (config.tokenOrPassword.isNotBlank()) AuthState.AUTHENTICATED else AuthState.GUEST
+                        if (responseBodyHealthy(response)) {
+                            Result.success(reachableAuthState(config))
+                        } else {
+                            Result.failure(IOException("Server reports unhealthy status"))
                         }
-                        Result.success(authState)
                     }
-                    401 -> Result.failure(IOException("HTTP 401 Unauthorized: Credentials rejected"))
-                    403 -> Result.failure(IOException("HTTP 403 Forbidden: Server policy denied access"))
-                    404 -> {
-                        // /v1/health might be disabled or filtered; test against root
-                        testRootEndpoint(baseUrl, config)
-                    }
+                    // /v1/health may be disabled behind a reverse proxy; try the root.
+                    404 -> testRootEndpoint(config)
+                    401 -> Result.failure(IOException("HTTP 401: credentials rejected by server"))
+                    403 -> Result.failure(IOException("HTTP 403: server policy denied access"))
+                    502, 503, 504 -> Result.failure(
+                        IOException("HTTP ${response.code}: server gateway is unavailable")
+                    )
                     else -> Result.failure(IOException("Server returned HTTP ${response.code}"))
                 }
             }
@@ -85,21 +106,20 @@ class NftyStreamClient(
         }
     }
 
-    private fun testRootEndpoint(baseUrl: String, config: ServerConfig): Result<AuthState> {
+    private fun testRootEndpoint(config: ServerConfig): Result<AuthState> {
+        val rootUrl = NtfyEndpoint.rootUrl(config.serverUrl, config.useHttpsOnly)
+            .getOrElse { return Result.failure(it) }
+
         val requestBuilder = Request.Builder()
-            .url(baseUrl)
+            .url(rootUrl)
             .get()
-            .header("User-Agent", "KaminariNfty-Android/1.0.0")
+            .header("User-Agent", USER_AGENT)
         applyAuthHeaders(requestBuilder, config)
 
         return try {
-            client.newCall(requestBuilder.build()).execute().use { response ->
-                if (response.isSuccessful || response.code == 302 || response.code == 301) {
-                    val authState = when (config.authMethod) {
-                        AuthMethod.GUEST -> AuthState.GUEST
-                        else -> if (config.tokenOrPassword.isNotBlank()) AuthState.AUTHENTICATED else AuthState.GUEST
-                    }
-                    Result.success(authState)
+            healthClient.newCall(requestBuilder.build()).execute().use { response ->
+                if (response.isSuccessful || response.code == 301 || response.code == 302) {
+                    Result.success(reachableAuthState(config))
                 } else {
                     Result.failure(IOException("Server returned HTTP ${response.code}"))
                 }
@@ -110,182 +130,238 @@ class NftyStreamClient(
     }
 
     /**
-     * Subscribes to ntfy JSON stream for the specified topics.
-     * Yields events incrementally without buffering infinite response.
+     * Subscribes to the documented ntfy JSON stream and emits events
+     * incrementally; the response body is never buffered in full.
+     *
+     * The blocking OkHttp read runs on [Dispatchers.IO]. `awaitClose` cancels the
+     * underlying call as soon as the collector is cancelled, which unblocks the
+     * pending socket read — otherwise a cancelled collector would leak the
+     * connection and its thread until the server spoke again.
      */
-    fun openJsonStream(
+    override fun openJsonStream(
         config: ServerConfig,
         topics: List<String>,
-        since: String = "12h"
-    ): Flow<NftyStreamEvent> = flow {
-        if (topics.isEmpty()) {
-            emit(NftyStreamEvent.Error(NftyErrorCategory.UNREACHABLE, "No topics configured for subscription", false))
-            return@flow
+        since: String,
+        poll: Boolean,
+    ): Flow<NftyStreamEvent> = callbackFlow {
+        val streamUrl = NtfyEndpoint.streamUrl(
+            rawBaseUrl = config.serverUrl,
+            topics = topics,
+            since = since,
+            requireHttps = config.useHttpsOnly,
+            poll = poll,
+        ).getOrElse { failure ->
+            trySend(
+                NftyStreamEvent.Error(
+                    NftyErrorCategory.UNREACHABLE,
+                    failure.message ?: "Invalid subscription request",
+                    canRetry = false,
+                )
+            )
+            close()
+            return@callbackFlow
         }
-
-        val baseUrl = config.serverUrl.trim().trimEnd('/')
-        val joinedTopics = topics.joinToString(",")
-        val streamUrl = "$baseUrl/$joinedTopics/json?since=$since"
 
         val requestBuilder = Request.Builder()
             .url(streamUrl)
             .get()
-            .header("Accept", "application/x-ndjson, application/json")
-            .header("User-Agent", "KaminariNfty-Android/1.0.0")
-
+            .header("Accept", "application/x-ndjson")
+            .header("User-Agent", USER_AGENT)
         applyAuthHeaders(requestBuilder, config)
 
-        var response: Response? = null
-        try {
-            response = client.newCall(requestBuilder.build()).execute()
+        val call = client.newCall(requestBuilder.build())
 
-            when (response.code) {
-                200 -> {
-                    val establishedState = when (config.authMethod) {
-                        AuthMethod.GUEST -> AuthState.GUEST
-                        AuthMethod.USERNAME_PASSWORD, AuthMethod.ACCESS_TOKEN ->
-                            if (config.tokenOrPassword.isNotBlank()) AuthState.AUTHENTICATED else AuthState.GUEST
-                    }
-                    emit(NftyStreamEvent.Connected(establishedState, response.code))
-
-                    // Parse stream incrementally line by line
-                    val source = response.body?.source() ?: throw IOException("Empty response body from ntfy")
-                    while (currentCoroutineContext().isActive && !source.exhausted()) {
-                        val line = source.readUtf8Line() ?: break
-                        if (line.isBlank()) continue
-
-                        parseJsonLine(line)?.let { event ->
-                            emit(event)
-                        }
+        val worker = launch(Dispatchers.IO) {
+            try {
+                call.execute().use { response ->
+                    if (response.code == 200) {
+                        send(NftyStreamEvent.Connected(connectedAuthState(config), response.code))
+                        readStreamBody(response) { event -> send(event) }
+                    } else {
+                        send(errorForHttpCode(response.code))
                     }
                 }
-                401 -> {
-                    emit(NftyStreamEvent.Error(NftyErrorCategory.AUTH, "HTTP 401 Unauthorized: Invalid credentials", false))
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                if (currentCoroutineContext().isActive) {
+                    val (category, mapped) = mapException(e)
+                    send(
+                        NftyStreamEvent.Error(
+                            category,
+                            mapped.message ?: "Connection failure",
+                            canRetry = category != NftyErrorCategory.AUTH &&
+                                category != NftyErrorCategory.FORBIDDEN,
+                        )
+                    )
                 }
-                403 -> {
-                    emit(NftyStreamEvent.Error(NftyErrorCategory.FORBIDDEN, "HTTP 403 Forbidden: Access denied to subscribed topic(s)", false))
-                }
-                else -> {
-                    emit(NftyStreamEvent.Error(NftyErrorCategory.UNREACHABLE, "Server returned HTTP ${response.code}", true))
-                }
+            } finally {
+                close()
             }
-        } catch (e: Exception) {
-            val (category, exception) = mapException(e)
-            emit(NftyStreamEvent.Error(category, exception.message ?: "Connection failure", true))
-        } finally {
-            response?.close()
+        }
+
+        awaitClose {
+            call.cancel()
+            worker.cancel()
         }
     }
 
-    private fun parseJsonLine(line: String): NftyStreamEvent? {
-        return try {
-            val json = JSONObject(line)
-            val eventType = json.optString("event")
+    private suspend fun readStreamBody(
+        response: Response,
+        emit: suspend (NftyStreamEvent) -> Unit,
+    ) {
+        val body = response.body ?: throw IOException("Empty response body from ntfy")
+        val source = body.source()
 
-            when (eventType) {
-                "open" -> null
-                "keepalive" -> {
-                    val time = json.optLong("time", System.currentTimeMillis() / 1000) * 1000L
-                    NftyStreamEvent.KeepAlive(time)
+        while (currentCoroutineContext().isActive) {
+            val line = try {
+                source.readUtf8LineStrict(NtfyEventParser.MAX_LINE_BYTES.toLong())
+            } catch (_: EOFException) {
+                break
+            } catch (e: IOException) {
+                // Oversized line: report it, then let the reconnect loop resync.
+                if (e.message?.contains("exceed", ignoreCase = true) == true) {
+                    emit(NftyStreamEvent.Malformed("stream line exceeds ${NtfyEventParser.MAX_LINE_BYTES} bytes"))
+                    break
                 }
-                "message" -> {
-                    val rawTime = json.optLong("time", System.currentTimeMillis() / 1000)
-                    val timeMillis = if (rawTime < 10000000000L) rawTime * 1000L else rawTime
-
-                    val id = json.optString("id", "msg_${System.currentTimeMillis()}")
-                    val topic = json.optString("topic", "general")
-                    val title = if (json.has("title") && !json.isNull("title")) json.optString("title") else null
-                    val message = json.optString("message", "")
-                    val priority = NftyPriority.fromLevel(json.optInt("priority", 3))
-
-                    val tagsList = mutableListOf<String>()
-                    val tagsArray = json.optJSONArray("tags")
-                    if (tagsArray != null) {
-                        for (i in 0 until tagsArray.length()) {
-                            tagsList.add(tagsArray.getString(i))
-                        }
-                    }
-
-                    val click = if (json.has("click") && !json.isNull("click")) json.optString("click") else null
-
-                    var attachment: NftyAttachment? = null
-                    val attachmentJson = json.optJSONObject("attachment")
-                    if (attachmentJson != null) {
-                        attachment = NftyAttachment(
-                            name = attachmentJson.optString("name", "attachment"),
-                            url = attachmentJson.optString("url", ""),
-                            type = attachmentJson.optString("type", null),
-                            size = if (attachmentJson.has("size")) attachmentJson.optLong("size") else null,
-                        )
-                    }
-
-                    val actionsList = mutableListOf<NftyAction>()
-                    val actionsArray = json.optJSONArray("actions")
-                    if (actionsArray != null) {
-                        for (i in 0 until actionsArray.length()) {
-                            val actJson = actionsArray.getJSONObject(i)
-                            actionsList.add(
-                                NftyAction(
-                                    id = actJson.optString("id", "act_$i"),
-                                    action = actJson.optString("action", "view"),
-                                    label = actJson.optString("label", "Action"),
-                                    url = actJson.optString("url", null),
-                                )
-                            )
-                        }
-                    }
-
-                    val nftyMessage = NftyMessage(
-                        id = id,
-                        time = timeMillis,
-                        event = "message",
-                        topic = topic,
-                        title = title,
-                        message = message,
-                        priority = priority,
-                        tags = tagsList,
-                        click = click,
-                        attachment = attachment,
-                        actions = actionsList,
-                        isRead = false,
-                        isSaved = false,
-                        isSample = false, // Live incoming message from server
-                    )
-                    NftyStreamEvent.MessageReceived(nftyMessage)
-                }
-                else -> null
+                throw e
             }
-        } catch (e: Exception) {
-            null
+
+            if (line.isBlank()) continue
+            emit(parseLine(line))
         }
+    }
+
+    private fun parseLine(line: String): NftyStreamEvent = when (val result = NtfyEventParser.parse(line)) {
+        is NtfyParseResult.Invalid -> NftyStreamEvent.Malformed(result.reason)
+        is NtfyParseResult.Parsed -> when (val event = result.event) {
+            is NtfyEvent.Message -> NftyStreamEvent.MessageReceived(event.message)
+            is NtfyEvent.MessageDeleted -> NftyStreamEvent.MessageDeleted(event.messageId, event.topic)
+            is NtfyEvent.TopicCleared -> NftyStreamEvent.TopicCleared(event.topic)
+            is NtfyEvent.Open -> NftyStreamEvent.KeepAlive(event.timestamp)
+            is NtfyEvent.KeepAlive -> NftyStreamEvent.KeepAlive(event.timestamp)
+            is NtfyEvent.PollRequest -> NftyStreamEvent.KeepAlive(System.currentTimeMillis())
+            is NtfyEvent.Unknown -> NftyStreamEvent.Malformed("unknown event type: ${event.eventType}")
+        }
+    }
+
+    private fun responseBodyHealthy(response: Response): Boolean = try {
+        val text = response.body?.string().orEmpty()
+        if (text.isBlank()) true else JSONObject(text).optBoolean("healthy", true)
+    } catch (_: Exception) {
+        // A non-JSON 200 from a reverse proxy is not proof of health.
+        false
+    }
+
+    private fun reachableAuthState(config: ServerConfig): AuthState =
+        if (config.authMethod.usesCredentials() && config.hasCredentials()) {
+            // Health is typically unauthenticated: reachability is proven,
+            // credential acceptance is not. Do not claim AUTHENTICATED here.
+            AuthState.REACHABLE
+        } else {
+            AuthState.GUEST
+        }
+
+    private fun connectedAuthState(config: ServerConfig): AuthState =
+        if (config.authMethod.usesCredentials() && config.hasCredentials()) {
+            // ntfy only opens a subscription after authorizing read access.
+            AuthState.AUTHENTICATED
+        } else {
+            AuthState.GUEST
+        }
+
+    private fun errorForHttpCode(code: Int): NftyStreamEvent.Error = when (code) {
+        401 -> NftyStreamEvent.Error(NftyErrorCategory.AUTH, "HTTP 401: invalid credentials", false)
+        403 -> NftyStreamEvent.Error(
+            NftyErrorCategory.FORBIDDEN,
+            "HTTP 403: access denied to subscribed topic(s)",
+            false,
+        )
+        // ntfy returns 404 for unknown topics and unauthorized topics alike.
+        404 -> NftyStreamEvent.Error(
+            NftyErrorCategory.FORBIDDEN,
+            "HTTP 404: topic not found or not authorized",
+            false,
+        )
+        400 -> NftyStreamEvent.Error(
+            NftyErrorCategory.STREAM,
+            "HTTP 400: server rejected the subscription request",
+            false,
+        )
+        429 -> NftyStreamEvent.Error(NftyErrorCategory.UNREACHABLE, "HTTP 429: rate limited", true)
+        502, 503, 504 -> NftyStreamEvent.Error(
+            NftyErrorCategory.UNREACHABLE,
+            "HTTP $code: server gateway is unavailable",
+            true,
+        )
+        in 500..599 -> NftyStreamEvent.Error(
+            NftyErrorCategory.STREAM,
+            "HTTP $code: server error",
+            true,
+        )
+        else -> NftyStreamEvent.Error(
+            NftyErrorCategory.STREAM,
+            "Server returned HTTP $code",
+            true,
+        )
     }
 
     private fun applyAuthHeaders(builder: Request.Builder, config: ServerConfig) {
         when (config.authMethod) {
-            AuthMethod.GUEST -> {
-                // Anonymous guest access: omit Authorization header
-            }
+            AuthMethod.GUEST -> Unit
             AuthMethod.USERNAME_PASSWORD -> {
                 if (config.username.isNotBlank() && config.tokenOrPassword.isNotBlank()) {
-                    val basicAuth = Credentials.basic(config.username, config.tokenOrPassword)
-                    builder.header("Authorization", basicAuth)
+                    builder.header(
+                        "Authorization",
+                        Credentials.basic(config.username, sanitizeHeaderValue(config.tokenOrPassword)),
+                    )
                 }
             }
             AuthMethod.ACCESS_TOKEN -> {
                 if (config.tokenOrPassword.isNotBlank()) {
-                    builder.header("Authorization", "Bearer ${config.tokenOrPassword.trim()}")
+                    builder.header(
+                        "Authorization",
+                        "Bearer ${sanitizeHeaderValue(config.tokenOrPassword)}",
+                    )
                 }
             }
         }
     }
 
-    private fun mapException(e: Exception): Pair<NftyErrorCategory, Exception> {
-        return when (e) {
-            is UnknownHostException -> Pair(NftyErrorCategory.DNS, IOException("DNS Resolution Error: Cannot resolve '${e.message}'"))
-            is SSLException -> Pair(NftyErrorCategory.TLS, IOException("TLS Handshake Failure: Endpoint certificate verification failed"))
-            is SocketTimeoutException -> Pair(NftyErrorCategory.TIMEOUT, IOException("Connection Timed Out: Server did not respond within deadline"))
-            is ConnectException -> Pair(NftyErrorCategory.UNREACHABLE, IOException("Server Unreachable: Connection refused on port 443"))
-            else -> Pair(NftyErrorCategory.STREAM, IOException(e.message ?: "Network stream failure"))
-        }
+    /** Prevents header injection through a pasted token containing CR/LF. */
+    private fun sanitizeHeaderValue(raw: String): String =
+        raw.trim().replace("\r", "").replace("\n", "")
+
+    private fun mapException(e: Exception): Pair<NftyErrorCategory, Exception> = when (e) {
+        is UnknownHostException -> Pair(
+            NftyErrorCategory.DNS,
+            IOException("DNS resolution failed for server host"),
+        )
+        is SSLException -> Pair(
+            NftyErrorCategory.TLS,
+            IOException("TLS handshake failed (certificate verification)"),
+        )
+        is SocketTimeoutException -> Pair(
+            NftyErrorCategory.TIMEOUT,
+            IOException("Server did not respond in time"),
+        )
+        is ConnectException -> Pair(
+            NftyErrorCategory.UNREACHABLE,
+            IOException("Server unreachable (connection refused)"),
+        )
+        else -> Pair(NftyErrorCategory.STREAM, IOException(e.message ?: "Network failure"))
+    }
+
+    private companion object {
+        private const val USER_AGENT = "KaminariNfty-Android/1.0.0"
+
+        private fun streamClient(): OkHttpClient = OkHttpClient.Builder()
+            .connectTimeout(15, TimeUnit.SECONDS)
+            // ntfy keepalives default to 45s; 120s detects a dead socket without
+            // dropping a healthy stream. No custom TrustManager: platform TLS only.
+            .readTimeout(120, TimeUnit.SECONDS)
+            .writeTimeout(15, TimeUnit.SECONDS)
+            .retryOnConnectionFailure(false)
+            .build()
     }
 }

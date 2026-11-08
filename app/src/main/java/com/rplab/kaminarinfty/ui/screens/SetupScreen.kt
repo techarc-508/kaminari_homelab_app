@@ -74,8 +74,9 @@ fun SetupScreen(
     serverConfig: ServerConfig,
     authState: AuthState,
     onSaveConfig: (ServerConfig) -> Unit,
-    onTestConnection: () -> Unit,
-    onProceed: () -> Unit,
+    onSaveAsNewProfile: (ServerConfig) -> Unit,
+    hasExistingProfile: Boolean,
+    onTestConnection: (ServerConfig) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var url by remember { mutableStateOf(serverConfig.serverUrl) }
@@ -85,7 +86,18 @@ fun SetupScreen(
     var showPassword by remember { mutableStateOf(false) }
     var showAdvanced by remember { mutableStateOf(false) }
     var enforceHttps by remember { mutableStateOf(serverConfig.useHttpsOnly) }
-    var autoReconnect by remember { mutableStateOf(serverConfig.autoReconnect) }
+
+    // Edited locally; persistence happens only on explicit Test/Connect (no
+    // per-keystroke DB writes or stream restarts — R-1).
+    val currentConfig = {
+        serverConfig.copy(
+            serverUrl = url.trim(),
+            authMethod = selectedAuthMethod,
+            username = username,
+            tokenOrPassword = tokenOrPassword,
+            useHttpsOnly = enforceHttps,
+        )
+    }
 
     Column(
         modifier = modifier
@@ -171,17 +183,7 @@ fun SetupScreen(
                 // Server URL input
                 OutlinedTextField(
                     value = url,
-                    onValueChange = {
-                        url = it
-                        onSaveConfig(
-                            serverConfig.copy(
-                                serverUrl = it,
-                                authMethod = selectedAuthMethod,
-                                username = username,
-                                tokenOrPassword = tokenOrPassword,
-                            )
-                        )
-                    },
+                    onValueChange = { url = it },
                     label = { Text("Server URL", fontFamily = RubikFontFamily) },
                     leadingIcon = {
                         Icon(
@@ -284,17 +286,7 @@ fun SetupScreen(
                     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                         OutlinedTextField(
                             value = username,
-                            onValueChange = {
-                                username = it
-                                onSaveConfig(
-                                    serverConfig.copy(
-                                        serverUrl = url,
-                                        authMethod = selectedAuthMethod,
-                                        username = it,
-                                        tokenOrPassword = tokenOrPassword,
-                                    )
-                                )
-                            },
+                            onValueChange = { username = it },
                             label = { Text("Username", fontFamily = RubikFontFamily) },
                             leadingIcon = {
                                 Icon(Icons.Default.Person, contentDescription = null, tint = KaminariTheme.colors.textSecondary, modifier = Modifier.size(18.dp))
@@ -310,17 +302,7 @@ fun SetupScreen(
 
                         OutlinedTextField(
                             value = tokenOrPassword,
-                            onValueChange = {
-                                tokenOrPassword = it
-                                onSaveConfig(
-                                    serverConfig.copy(
-                                        serverUrl = url,
-                                        authMethod = selectedAuthMethod,
-                                        username = username,
-                                        tokenOrPassword = it,
-                                    )
-                                )
-                            },
+                            onValueChange = { tokenOrPassword = it },
                             label = { Text("Password", fontFamily = RubikFontFamily) },
                             leadingIcon = {
                                 Icon(Icons.Default.Lock, contentDescription = null, tint = KaminariTheme.colors.textSecondary, modifier = Modifier.size(18.dp))
@@ -350,17 +332,7 @@ fun SetupScreen(
                 AnimatedVisibility(visible = selectedAuthMethod == AuthMethod.ACCESS_TOKEN) {
                     OutlinedTextField(
                         value = tokenOrPassword,
-                        onValueChange = {
-                            tokenOrPassword = it
-                            onSaveConfig(
-                                serverConfig.copy(
-                                    serverUrl = url,
-                                    authMethod = selectedAuthMethod,
-                                    username = username,
-                                    tokenOrPassword = it,
-                                )
-                            )
-                        },
+                        onValueChange = { tokenOrPassword = it },
                         label = { Text("Access Token (tk_...)", fontFamily = RubikFontFamily) },
                         leadingIcon = {
                             Icon(Icons.Default.Key, contentDescription = null, tint = KaminariTheme.colors.textSecondary, modifier = Modifier.size(18.dp))
@@ -437,22 +409,6 @@ fun SetupScreen(
                                         colors = SwitchDefaults.colors(checkedThumbColor = KaminariTheme.colors.accent)
                                     )
                                 }
-
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically,
-                                ) {
-                                    Column {
-                                        Text("Auto Reconnect with Jitter", fontFamily = RubikFontFamily, fontSize = 12.sp, color = KaminariTheme.colors.textPrimary)
-                                        Text("Bounded exponential backoff on disconnect", fontFamily = RubikFontFamily, fontSize = 10.sp, color = KaminariTheme.colors.textSecondary)
-                                    }
-                                    Switch(
-                                        checked = autoReconnect,
-                                        onCheckedChange = { autoReconnect = it },
-                                        colors = SwitchDefaults.colors(checkedThumbColor = KaminariTheme.colors.accent)
-                                    )
-                                }
                             }
                         }
                     }
@@ -464,7 +420,7 @@ fun SetupScreen(
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
                     OutlinedButton(
-                        onClick = onTestConnection,
+                        onClick = { onTestConnection(currentConfig()) },
                         modifier = Modifier
                             .weight(1f)
                             .testTag("test_connection_button"),
@@ -479,7 +435,7 @@ fun SetupScreen(
                     }
 
                     Button(
-                        onClick = onProceed,
+                        onClick = { onSaveConfig(currentConfig()) },
                         modifier = Modifier
                             .weight(1f)
                             .testTag("enter_app_button"),
@@ -492,12 +448,30 @@ fun SetupScreen(
                         Text("Connect", fontFamily = RubikFontFamily, fontWeight = FontWeight.Bold, fontSize = 13.sp)
                     }
                 }
+
+                if (hasExistingProfile) {
+                    OutlinedButton(
+                        onClick = { onSaveAsNewProfile(currentConfig()) },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("save_new_profile_button"),
+                        shape = RoundedCornerShape(8.dp),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, KaminariTheme.colors.border),
+                    ) {
+                        Text(
+                            "Save as New Profile",
+                            fontFamily = RubikFontFamily,
+                            fontSize = 12.sp,
+                            color = KaminariTheme.colors.textPrimary,
+                        )
+                    }
+                }
             }
         }
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // Phase 1 Sample Data Notice
+        // Honest local-first notice (no unverified claims)
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -508,14 +482,14 @@ fun SetupScreen(
         ) {
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(
-                    text = "FIELD MANUAL NOTICE // PHASE 1",
+                    text = "LOCAL-FIRST // PRIVACY NOTICE",
                     fontFamily = JetBrainsMonoFontFamily,
                     fontSize = 10.sp,
                     fontWeight = FontWeight.Bold,
                     color = KaminariTheme.colors.accent,
                 )
                 Text(
-                    text = "Phase 1 implements the full UI experience with realistic homelab sample telemetry. No credentials are transmitted to external servers in this stage.",
+                    text = "History stays on this device in an encrypted app sandbox. Tokens are encrypted with a hardware-backed Android Keystore key before being written to disk.",
                     fontFamily = RubikFontFamily,
                     fontSize = 11.sp,
                     color = KaminariTheme.colors.textSecondary,

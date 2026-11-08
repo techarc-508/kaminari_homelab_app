@@ -25,11 +25,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -40,7 +36,6 @@ import androidx.compose.ui.unit.sp
 import com.rplab.kaminarinfty.model.AuthState
 import com.rplab.kaminarinfty.ui.theme.KaminariTheme
 import com.rplab.kaminarinfty.ui.theme.RubikFontFamily
-import kotlinx.coroutines.delay
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -50,7 +45,7 @@ fun NftyTopBar(
     title: String = "KAMINARI-FUJI",
     subtitle: String = "ntfy node • nfty.rplab.qzz.io",
     authState: AuthState = AuthState.GUEST,
-    isSampleData: Boolean = true,
+    isSampleData: Boolean = false,
     showBackButton: Boolean = false,
     onBackClick: (() -> Unit)? = null,
     onSearchClick: (() -> Unit)? = null,
@@ -58,21 +53,12 @@ fun NftyTopBar(
     onSettingsClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
-    // Live clock formatted in monospace matching the live website screenshot (e.g. "12:49:16 AM")
-    var currentTimeString by remember {
-        mutableStateOf(SimpleDateFormat("hh:mm:ss a", Locale.getDefault()).format(Date()))
+    // Static timestamp: no periodic recomposition on low-RAM / E-Ink devices.
+    val currentTimeString = remember {
+        SimpleDateFormat("hh:mm:ss a", Locale.getDefault()).format(Date())
     }
-    var currentDateString by remember {
-        mutableStateOf(SimpleDateFormat("EEE, MMM d", Locale.getDefault()).format(Date()))
-    }
-
-    LaunchedEffect(Unit) {
-        while (true) {
-            val now = Date()
-            currentTimeString = SimpleDateFormat("hh:mm:ss a", Locale.getDefault()).format(now)
-            currentDateString = SimpleDateFormat("EEE, MMM d", Locale.getDefault()).format(now)
-            delay(1000)
-        }
+    val currentDateString = remember {
+        SimpleDateFormat("EEE, MMM d", Locale.getDefault()).format(Date())
     }
 
     Box(

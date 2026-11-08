@@ -26,7 +26,9 @@ data class NftyMessage(
     val click: String? = null,
     val attachment: NftyAttachment? = null,
     val actions: List<NftyAction> = emptyList(),
+    /** ntfy `expires` (Unix seconds after normalisation to millis is NOT applied here). */
+    val expiry: Long? = null,
     val isRead: Boolean = false,
     val isSaved: Boolean = false,
-    val isSample: Boolean = true,
+    val isSample: Boolean = false,
 )

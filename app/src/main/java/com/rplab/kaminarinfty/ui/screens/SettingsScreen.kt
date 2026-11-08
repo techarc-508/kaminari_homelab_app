@@ -18,17 +18,12 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.BrightnessAuto
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.DarkMode
-import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Palette
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Storage
-import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.Wifi
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -38,10 +33,6 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -49,9 +40,11 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.rplab.kaminarinfty.BuildConfig
 import com.rplab.kaminarinfty.ThemeSetting
 import com.rplab.kaminarinfty.model.AuthState
 import com.rplab.kaminarinfty.model.ServerConfig
+import com.rplab.kaminarinfty.model.ServerProfile
 import com.rplab.kaminarinfty.ui.components.NftyTopBar
 import com.rplab.kaminarinfty.ui.theme.JetBrainsMonoFontFamily
 import com.rplab.kaminarinfty.ui.theme.KaminariTheme
@@ -61,22 +54,28 @@ import com.rplab.kaminarinfty.ui.theme.RubikFontFamily
 fun SettingsScreen(
     serverConfig: ServerConfig,
     authState: AuthState,
+    profiles: List<ServerProfile>,
+    activeProfileId: String?,
+    reconnectAttempt: Int,
+    lastCursor: String?,
     themeSetting: ThemeSetting,
     isCompactDensity: Boolean,
     isSampleData: Boolean,
+    sampleDataEnabled: Boolean,
+    historyCount: Int,
+    malformedLines: Int,
     onThemeChange: (ThemeSetting) -> Unit,
     onToggleDensity: () -> Unit,
     onTestConnection: () -> Unit,
+    onSelectProfile: (String) -> Unit,
+    onCatchUp: () -> Unit,
     onNavigateToSetup: () -> Unit,
     onClearHistory: () -> Unit,
     onClearSaved: () -> Unit,
-    onResetSampleData: () -> Unit,
+    onToggleSampleData: (Boolean) -> Unit,
     onSearchClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    var localNotificationsEnabled by remember { mutableStateOf(true) }
-    var soundVibrationEnabled by remember { mutableStateOf(true) }
-
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -84,7 +83,7 @@ fun SettingsScreen(
     ) {
         NftyTopBar(
             title = "Settings",
-            subtitle = "KAMINARI // CONFIGURATION & TELEMETRY",
+            subtitle = "KAMINARI // CONFIGURATION",
             authState = authState,
             isSampleData = isSampleData,
             onSearchClick = onSearchClick,
@@ -107,7 +106,12 @@ fun SettingsScreen(
                     ) {
                         Column {
                             Text("Server Endpoint", fontFamily = RubikFontFamily, fontSize = 12.sp, color = KaminariTheme.colors.textSecondary)
-                            Text(serverConfig.serverUrl, fontFamily = JetBrainsMonoFontFamily, fontSize = 13.sp, color = KaminariTheme.colors.textPrimary)
+                            Text(
+                                serverConfig.serverUrl.ifBlank { "Not configured" },
+                                fontFamily = JetBrainsMonoFontFamily,
+                                fontSize = 13.sp,
+                                color = KaminariTheme.colors.textPrimary,
+                            )
                         }
                         Box(
                             modifier = Modifier
@@ -165,7 +169,81 @@ fun SettingsScreen(
                 }
             }
 
-            // Section 2: APPEARANCE
+            // Section 2: SERVER PROFILES (local, switchable, no secrets shown)
+            SettingsSectionCard(title = "SERVER PROFILES", icon = Icons.Default.Storage) {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (profiles.isEmpty()) {
+                        Text(
+                            text = "No saved profiles yet — connect once to create the first one.",
+                            fontFamily = RubikFontFamily,
+                            fontSize = 12.sp,
+                            color = KaminariTheme.colors.textSecondary,
+                        )
+                    } else {
+                        profiles.forEach { profile ->
+                            val isActive = profile.id == activeProfileId
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        profile.displayName.ifBlank { profile.baseUrl },
+                                        fontFamily = RubikFontFamily,
+                                        fontSize = 13.sp,
+                                        color = KaminariTheme.colors.textPrimary,
+                                    )
+                                    Text(
+                                        profile.baseUrl,
+                                        fontFamily = JetBrainsMonoFontFamily,
+                                        fontSize = 10.sp,
+                                        color = KaminariTheme.colors.textSecondary,
+                                    )
+                                    Text(
+                                        text = if (profile.hasStoredSecret) {
+                                            "${profile.authMethod.displayName} — encrypted credential stored"
+                                        } else {
+                                            profile.authMethod.displayName
+                                        },
+                                        fontFamily = RubikFontFamily,
+                                        fontSize = 10.sp,
+                                        color = KaminariTheme.colors.textSecondary,
+                                    )
+                                }
+                                if (isActive) {
+                                    Text(
+                                        text = "ACTIVE",
+                                        fontFamily = JetBrainsMonoFontFamily,
+                                        fontSize = 9.sp,
+                                        color = KaminariTheme.colors.success,
+                                    )
+                                } else {
+                                    OutlinedButton(
+                                        onClick = { onSelectProfile(profile.id) },
+                                        shape = RoundedCornerShape(6.dp),
+                                        border = androidx.compose.foundation.BorderStroke(1.dp, KaminariTheme.colors.border),
+                                        modifier = Modifier.testTag("use_profile_${profile.id}"),
+                                    ) {
+                                        Text("Use", fontFamily = RubikFontFamily, fontSize = 11.sp, color = KaminariTheme.colors.textPrimary)
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    OutlinedButton(
+                        onClick = onCatchUp,
+                        modifier = Modifier.fillMaxWidth().testTag("resync_history_button"),
+                        shape = RoundedCornerShape(6.dp),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, KaminariTheme.colors.border),
+                    ) {
+                        Text("Re-sync missed history", fontFamily = RubikFontFamily, fontSize = 12.sp, color = KaminariTheme.colors.textPrimary)
+                    }
+                }
+            }
+
+            // Section 3: APPEARANCE
             SettingsSectionCard(title = "APPEARANCE & THEME", icon = Icons.Default.Palette) {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Text(
@@ -191,8 +269,7 @@ fun SettingsScreen(
                                     )
                                     .border(
                                         1.dp,
-                                        if (isSelected) KaminariTheme.colors.accent
-                                        else KaminariTheme.colors.border,
+                                        if (isSelected) KaminariTheme.colors.accent else KaminariTheme.colors.border,
                                         RoundedCornerShape(8.dp)
                                     )
                                     .clickable { onThemeChange(mode) }
@@ -228,7 +305,6 @@ fun SettingsScreen(
                         }
                     }
 
-                    // Density toggle
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
@@ -247,41 +323,9 @@ fun SettingsScreen(
                 }
             }
 
-            // Section 3: NOTIFICATIONS & DELIVERY
+            // Section 4: NOTIFICATIONS & DELIVERY (honest phase status)
             SettingsSectionCard(title = "NOTIFICATIONS & DELIVERY", icon = Icons.Default.Notifications) {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Column {
-                            Text("Client Notifications", fontFamily = RubikFontFamily, fontSize = 13.sp, color = KaminariTheme.colors.textPrimary)
-                            Text("Show status bar alerts for urgent homelab events", fontFamily = RubikFontFamily, fontSize = 11.sp, color = KaminariTheme.colors.textSecondary)
-                        }
-                        Switch(
-                            checked = localNotificationsEnabled,
-                            onCheckedChange = { localNotificationsEnabled = it },
-                            colors = SwitchDefaults.colors(checkedThumbColor = KaminariTheme.colors.accent),
-                        )
-                    }
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Column {
-                            Text("Sound & Vibration", fontFamily = RubikFontFamily, fontSize = 13.sp, color = KaminariTheme.colors.textPrimary)
-                            Text("Respect Android system DND and priority channels", fontFamily = RubikFontFamily, fontSize = 11.sp, color = KaminariTheme.colors.textSecondary)
-                        }
-                        Switch(
-                            checked = soundVibrationEnabled,
-                            onCheckedChange = { soundVibrationEnabled = it },
-                            colors = SwitchDefaults.colors(checkedThumbColor = KaminariTheme.colors.accent),
-                        )
-                    }
-
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -290,7 +334,8 @@ fun SettingsScreen(
                             .padding(10.dp)
                     ) {
                         Text(
-                            text = "Background Delivery: Live SSE stream active in foreground. Phase 6 will implement battery-conscious persistent relay handling.",
+                            text = "Background delivery is not implemented yet. The live stream currently runs only while the app is in the foreground. " +
+                                "Instant and Battery Saver modes with Android system notifications are scheduled for the delivery phase.",
                             fontFamily = JetBrainsMonoFontFamily,
                             fontSize = 10.sp,
                             color = KaminariTheme.colors.textSecondary,
@@ -300,7 +345,7 @@ fun SettingsScreen(
                 }
             }
 
-            // Section 4: LOCAL DATA & RETENTION
+            // Section 5: LOCAL DATA
             SettingsSectionCard(title = "LOCAL DATA & CACHE", icon = Icons.Default.Storage) {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Row(
@@ -308,8 +353,13 @@ fun SettingsScreen(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Text("Retention Policy", fontFamily = RubikFontFamily, fontSize = 13.sp, color = KaminariTheme.colors.textPrimary)
-                        Text("30 Days (Standard)", fontFamily = JetBrainsMonoFontFamily, fontSize = 11.sp, color = KaminariTheme.colors.accent)
+                        Text("Stored notifications", fontFamily = RubikFontFamily, fontSize = 13.sp, color = KaminariTheme.colors.textPrimary)
+                        Text(
+                            "$historyCount",
+                            fontFamily = JetBrainsMonoFontFamily,
+                            fontSize = 11.sp,
+                            color = KaminariTheme.colors.accent,
+                        )
                     }
 
                     Row(
@@ -317,8 +367,16 @@ fun SettingsScreen(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Text("Local Cache Size", fontFamily = RubikFontFamily, fontSize = 13.sp, color = KaminariTheme.colors.textPrimary)
-                        Text("124 KB (8 messages)", fontFamily = JetBrainsMonoFontFamily, fontSize = 11.sp, color = KaminariTheme.colors.textSecondary)
+                        Column {
+                            Text("Demo Dataset", fontFamily = RubikFontFamily, fontSize = 13.sp, color = KaminariTheme.colors.textPrimary)
+                            Text("Shows sample notifications only; never written to history", fontFamily = RubikFontFamily, fontSize = 11.sp, color = KaminariTheme.colors.textSecondary)
+                        }
+                        Switch(
+                            checked = sampleDataEnabled,
+                            onCheckedChange = onToggleSampleData,
+                            colors = SwitchDefaults.colors(checkedThumbColor = KaminariTheme.colors.accent),
+                            modifier = Modifier.testTag("sample_data_switch"),
+                        )
                     }
 
                     Row(
@@ -343,35 +401,27 @@ fun SettingsScreen(
                             Text("Clear Saved", fontFamily = RubikFontFamily, fontSize = 11.sp, color = KaminariTheme.colors.textPrimary)
                         }
                     }
-
-                    Button(
-                        onClick = onResetSampleData,
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = KaminariTheme.colors.surfaceSecondary,
-                            contentColor = KaminariTheme.colors.accent,
-                        ),
-                        shape = RoundedCornerShape(6.dp),
-                        border = androidx.compose.foundation.BorderStroke(1.dp, KaminariTheme.colors.border),
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(6.dp),
-                        ) {
-                            Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
-                            Text("Restore Sample Notifications & Topics", fontFamily = RubikFontFamily, fontSize = 12.sp)
-                        }
-                    }
                 }
             }
 
-            // Section 5: DIAGNOSTICS
-            SettingsSectionCard(title = "DIAGNOSTICS & TELEMETRY", icon = Icons.Default.Info) {
+            // Section 6: DIAGNOSTICS (real values only)
+            SettingsSectionCard(title = "DIAGNOSTICS", icon = Icons.Default.Info) {
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    DiagnosticRow(label = "CLIENT VERSION", value = "1.0.0-rc1 (Build 20261015)")
-                    DiagnosticRow(label = "STREAM PROTOCOL", value = "HTTP/2 Server-Sent Events")
-                    DiagnosticRow(label = "CIPHER SUITE", value = "TLS_AES_256_GCM_SHA384")
-                    DiagnosticRow(label = "SECURITY BOUNDARY", value = "Zero plaintext log redaction active")
+                    DiagnosticRow(
+                        label = "CLIENT VERSION",
+                        value = "${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})",
+                    )
+                    DiagnosticRow(label = "CONNECTION", value = authState.statusLabel)
+                    DiagnosticRow(label = "MALFORMED LINES", value = "$malformedLines")
+                    DiagnosticRow(label = "RECONNECT ATTEMPT", value = "$reconnectAttempt")
+                    DiagnosticRow(
+                        label = "HISTORY CURSOR",
+                        value = lastCursor ?: "none (first sync uses 12h window)",
+                    )
+                    DiagnosticRow(
+                        label = "SERVER VERSION",
+                        value = "unverified — health probe pending",
+                    )
                     DiagnosticRow(label = "DESIGN FAMILY", value = "RPLab / Kaminari-Fuji")
                 }
             }

@@ -23,7 +23,7 @@ import com.rplab.kaminarinfty.ui.theme.KaminariTheme
 fun NftyConnectionIndicator(
     authState: AuthState,
     modifier: Modifier = Modifier,
-    isSampleData: Boolean = true,
+    isSampleData: Boolean = false,
 ) {
     val (dotColor, statusText) = when {
         isSampleData -> Pair(

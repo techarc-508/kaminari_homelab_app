@@ -5,7 +5,7 @@ Format: `date · phase/commit · fact` (append-only).
 - 2026-11-08 · audit · READ-ONLY audit delivered: `AUDIT_REPORT.md`, `CURRENT_ARCHITECTURE.md`, `API_CAPABILITY_MATRIX.md`, `PHASE_0_EXECUTION_PLAN.md`; `ctx_note #2` decision trace completed with `OWNER_DECISION_REVIEW.md`.
 - 2026-11-08 · decision · **Owner approval received** (chat): `Approved: D1-D6, R-1, C3, C4, applicationId com.rplab.kaminarinfty — start Phase 0.` Sudo access supplied for D1 toolchain install; password kept session-only, never persisted.
 - 2026-11-08 · phase-0 · Ordered changes per approved decisions (now executing):
-  - D1 toolchain: `apt install openjdk-21-jdk-headless` → OpenJDK 21.0.12.b1 live (exit 0); cmdline-tools + Gradle 9.3.1 downloads in flight into `~/opt`.
+  - D1 toolchain: `apt install openjdk-21-jdk-headless` → OpenJDK 21.0.12.1 live (exit 0); cmdline-tools + Gradle 9.3.1 downloads in flight into `~/opt`.
   - D4 git: repo initialized (`main`), baseline commit `dac123d` + tag `audit-baseline`.
   - D2 identity: namespace + applicationId → `com.rplab.kaminarinfty` (commits `a8a03b8`, fixup `5a44fac`; zero old-ID references remain in app sources).
   - C3 doc amendment: `PLAN.md` pipeline event list → now includes `message_delete`, `message_clear` per docs (server v2.37.2).

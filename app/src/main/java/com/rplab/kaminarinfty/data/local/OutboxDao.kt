@@ -17,23 +17,29 @@ interface OutboxDao {
     )
     fun observeRecent(profileId: String, limit: Int): Flow<List<OutboxEntryEntity>>
 
-    @Query("SELECT * FROM outbox_entries WHERE clientId = :clientId LIMIT 1")
-    suspend fun getById(clientId: String): OutboxEntryEntity?
+    /** Profile-scoped lookup: a caller cannot read another profile's row by ID. */
+    @Query(
+        "SELECT * FROM outbox_entries WHERE profileId = :profileId AND clientId = :clientId LIMIT 1"
+    )
+    suspend fun getById(profileId: String, clientId: String): OutboxEntryEntity?
 
     /** Claims a QUEUED row exactly once. Returns 0 when another sender won. */
     @Query(
         "UPDATE outbox_entries SET state = 'SENDING', attemptCount = attemptCount + 1, " +
-            "updatedAt = :now WHERE clientId = :clientId AND state = 'QUEUED'"
+            "updatedAt = :now WHERE profileId = :profileId AND clientId = :clientId " +
+            "AND state = 'QUEUED'"
     )
-    suspend fun claim(clientId: String, now: Long): Int
+    suspend fun claim(profileId: String, clientId: String, now: Long): Int
 
     /** Completes a claimed row. Returns 0 when it is no longer SENDING. */
     @Query(
         "UPDATE outbox_entries SET state = :state, serverMessageId = :serverMessageId, " +
             "lastError = :lastError, retryable = :retryable, acceptedAt = :acceptedAt, " +
-            "updatedAt = :now WHERE clientId = :clientId AND state = 'SENDING'"
+            "updatedAt = :now WHERE profileId = :profileId AND clientId = :clientId " +
+            "AND state = 'SENDING'"
     )
     suspend fun complete(
+        profileId: String,
         clientId: String,
         state: String,
         serverMessageId: String?,
@@ -46,40 +52,51 @@ interface OutboxDao {
     /** Requeues a terminal row for an explicit user retry. */
     @Query(
         "UPDATE outbox_entries SET state = 'QUEUED', updatedAt = :now " +
-            "WHERE clientId = :clientId AND state IN ('FAILED', 'AMBIGUOUS')"
+            "WHERE profileId = :profileId AND clientId = :clientId " +
+            "AND state IN ('FAILED', 'AMBIGUOUS')"
     )
-    suspend fun requeue(clientId: String, now: Long): Int
+    suspend fun requeue(profileId: String, clientId: String, now: Long): Int
 
     /** Process restart: a SENDING row older than the cutoff is uncertain, not safe to resend. */
     @Query(
         "UPDATE outbox_entries SET state = 'AMBIGUOUS', lastError = :reason, updatedAt = :now " +
-            "WHERE state = 'SENDING' AND updatedAt < :cutoff"
+            "WHERE profileId = :profileId AND state = 'SENDING' AND updatedAt < :cutoff"
     )
-    suspend fun recoverStuckSending(cutoff: Long, now: Long, reason: String): Int
+    suspend fun recoverStuckSending(
+        profileId: String,
+        cutoff: Long,
+        now: Long,
+        reason: String,
+    ): Int
 
     @Query(
-        "DELETE FROM outbox_entries WHERE clientId = :clientId " +
+        "DELETE FROM outbox_entries WHERE profileId = :profileId AND clientId = :clientId " +
             "AND state IN ('QUEUED', 'FAILED', 'AMBIGUOUS')"
     )
-    suspend fun deleteIfUnsent(clientId: String): Int
+    suspend fun deleteIfUnsent(profileId: String, clientId: String): Int
 
+    /** Low-level retention query; normal callers use [prune]. */
     @Query(
         "DELETE FROM outbox_entries WHERE profileId = :profileId " +
             "AND state IN ('ACCEPTED', 'FAILED', 'AMBIGUOUS') AND updatedAt < :cutoff"
     )
     suspend fun pruneOlderThan(profileId: String, cutoff: Long): Int
 
+    /** Keeps the newest terminal rows only; QUEUED and SENDING rows are never eligible. */
     @Query(
         "DELETE FROM outbox_entries WHERE profileId = :profileId " +
             "AND state IN ('ACCEPTED', 'FAILED', 'AMBIGUOUS') AND clientId NOT IN (" +
             "SELECT clientId FROM outbox_entries WHERE profileId = :profileId " +
+            "AND state IN ('ACCEPTED', 'FAILED', 'AMBIGUOUS') " +
             "ORDER BY createdAt DESC, clientId DESC LIMIT :keepMax)"
     )
     suspend fun pruneBeyond(profileId: String, keepMax: Int): Int
 
+    /** Applies the approved 30-day / 500-terminal-row policy. */
     @Transaction
-    suspend fun prune(profileId: String, cutoff: Long, keepMax: Int): Int =
-        pruneOlderThan(profileId, cutoff) + pruneBeyond(profileId, keepMax)
+    suspend fun prune(profileId: String, now: Long): Int =
+        pruneOlderThan(profileId, RetentionPolicy.outboxCutoff(now)) +
+            pruneBeyond(profileId, RetentionPolicy.OUTBOX_MAX_TERMINAL_ENTRIES_PER_PROFILE)
 
     @Query("SELECT COUNT(*) FROM outbox_entries WHERE profileId = :profileId")
     suspend fun count(profileId: String): Int

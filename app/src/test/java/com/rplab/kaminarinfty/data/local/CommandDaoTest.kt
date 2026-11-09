@@ -7,6 +7,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -84,19 +85,50 @@ class CommandDaoTest {
     }
 
     @Test
-    fun `markStatus is conditional on the expected status`() = runTest {
+    fun `valid submitted transition completes before expiry`() = runTest {
         seedProfile()
-        dao.insert(command("c1"))
+        dao.insert(command("c1", expiresAt = 500))
 
         assertEquals(
             1,
-            dao.markStatus("c1", "SUBMITTED", "COMPLETED", "{\"ok\":true}", "OK", 10),
+            dao.markStatus("primary", "c1", "COMPLETED", "{\"ok\":true}", "OK", 10),
         )
-        assertEquals(
-            0,
-            dao.markStatus("c1", "SUBMITTED", "FAILED", null, "late", 11),
-        )
-        val row = dao.getById("c1")!!
+        val row = dao.getById("primary", "c1")!!
+        assertEquals("COMPLETED", row.status)
+        assertEquals("OK", row.resultSummary)
+    }
+
+    @Test
+    fun `terminal state cannot be overwritten by terminal or nonterminal targets`() = runTest {
+        seedProfile()
+        dao.insert(command("done", status = "COMPLETED", expiresAt = 500))
+
+        assertEquals(0, dao.markStatus("primary", "done", "FAILED", null, "late", 10))
+        assertEquals(0, dao.markStatus("primary", "done", "SUBMITTED", null, null, 10))
+        assertEquals(0, dao.markStatus("primary", "done", "SENDING", null, null, 10))
+
+        val row = dao.getById("primary", "done")!!
+        assertEquals("COMPLETED", row.status)
+        assertNull(row.resultSummary)
+    }
+
+    @Test
+    fun `expired submitted transition is rejected`() = runTest {
+        seedProfile()
+        dao.insert(command("expired", expiresAt = 50))
+
+        assertEquals(0, dao.markStatus("primary", "expired", "COMPLETED", null, "late", 100))
+        assertEquals("SUBMITTED", dao.getById("primary", "expired")!!.status)
+    }
+
+    @Test
+    fun `stale update after completion is rejected`() = runTest {
+        seedProfile()
+        dao.insert(command("c1", expiresAt = 500))
+        assertEquals(1, dao.markStatus("primary", "c1", "COMPLETED", "{\"ok\":true}", "OK", 10))
+
+        assertEquals(0, dao.markStatus("primary", "c1", "FAILED", null, "late", 11))
+        val row = dao.getById("primary", "c1")!!
         assertEquals("COMPLETED", row.status)
         assertEquals("OK", row.resultSummary)
     }
@@ -111,10 +143,10 @@ class CommandDaoTest {
         dao.insert(command("other", profileId = "secondary", expiresAt = 50))
 
         assertEquals(1, dao.expireOverdue("primary", now = 100))
-        assertEquals("EXPIRED", dao.getById("old")!!.status)
-        assertEquals("SUBMITTED", dao.getById("future")!!.status)
-        assertEquals("COMPLETED", dao.getById("done")!!.status)
-        assertEquals("SUBMITTED", dao.getById("other")!!.status)
+        assertEquals("EXPIRED", dao.getById("primary", "old")!!.status)
+        assertEquals("SUBMITTED", dao.getById("primary", "future")!!.status)
+        assertEquals("COMPLETED", dao.getById("primary", "done")!!.status)
+        assertEquals("SUBMITTED", dao.getById("secondary", "other")!!.status)
     }
 
     @Test
@@ -127,12 +159,12 @@ class CommandDaoTest {
 
         assertEquals(2, dao.prune("primary", cutoff = 15, keepMax = 1))
         assertEquals(2, dao.count("primary"))
-        assertTrue(dao.getById("new") != null)
-        assertTrue(dao.getById("pending") != null)
+        assertTrue(dao.getById("primary", "new") != null)
+        assertTrue(dao.getById("primary", "pending") != null)
     }
 
     @Test
-    fun `observeRecent and findByNonce are profile aware`() = runTest {
+    fun `id and nonce lookups are profile scoped`() = runTest {
         seedProfile("primary")
         seedProfile("secondary")
         dao.insert(command("a", nonce = "n-a", createdAt = 10))
@@ -140,6 +172,13 @@ class CommandDaoTest {
         dao.insert(command("other", nonce = "n-other", profileId = "secondary", createdAt = 30))
 
         assertEquals(listOf("b", "a"), dao.observeRecent("primary", 10).first().map { it.commandId })
-        assertEquals("a", dao.findByNonce("n-a")!!.commandId)
+        assertEquals("a", dao.findByNonce("primary", "n-a")!!.commandId)
+        assertNull(dao.getById("primary", "other"))
+        assertNull(dao.findByNonce("primary", "n-other"))
+        assertEquals(
+            0,
+            dao.markStatus("primary", "other", "COMPLETED", null, "wrong profile", 10),
+        )
+        assertEquals("SUBMITTED", dao.getById("secondary", "other")!!.status)
     }
 }

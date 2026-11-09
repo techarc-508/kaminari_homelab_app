@@ -17,21 +17,31 @@ interface CommandDao {
     )
     fun observeRecent(profileId: String, limit: Int): Flow<List<CommandRequestEntity>>
 
-    @Query("SELECT * FROM command_requests WHERE commandId = :commandId LIMIT 1")
-    suspend fun getById(commandId: String): CommandRequestEntity?
+    /** Profile-scoped lookup: a caller cannot read another profile's command by ID. */
+    @Query(
+        "SELECT * FROM command_requests WHERE profileId = :profileId AND commandId = :commandId LIMIT 1"
+    )
+    suspend fun getById(profileId: String, commandId: String): CommandRequestEntity?
 
-    @Query("SELECT * FROM command_requests WHERE nonce = :nonce LIMIT 1")
-    suspend fun findByNonce(nonce: String): CommandRequestEntity?
+    @Query(
+        "SELECT * FROM command_requests WHERE profileId = :profileId AND nonce = :nonce LIMIT 1"
+    )
+    suspend fun findByNonce(profileId: String, nonce: String): CommandRequestEntity?
 
-    /** Conditional transition; returns 0 when the row is no longer in [expectedStatus]. */
+    /**
+     * Only SUBMITTED -> terminal is legal, and only before expiry. A stale,
+     * expired, or already-terminal row returns 0 and keeps its result.
+     */
     @Query(
         "UPDATE command_requests SET status = :status, resultJson = :resultJson, " +
             "resultSummary = :resultSummary, updatedAt = :now " +
-            "WHERE commandId = :commandId AND status = :expectedStatus"
+            "WHERE profileId = :profileId AND commandId = :commandId " +
+            "AND status = 'SUBMITTED' AND expiresAt > :now " +
+            "AND :status IN ('COMPLETED', 'FAILED', 'EXPIRED', 'REJECTED')"
     )
     suspend fun markStatus(
+        profileId: String,
         commandId: String,
-        expectedStatus: String,
         status: String,
         resultJson: String?,
         resultSummary: String?,
@@ -50,11 +60,13 @@ interface CommandDao {
     )
     suspend fun pruneOlderThan(profileId: String, cutoff: Long): Int
 
+    /** Keeps the newest terminal rows only; SUBMITTED rows are never eligible. */
     @Query(
         "DELETE FROM command_requests WHERE profileId = :profileId " +
             "AND status IN ('COMPLETED', 'FAILED', 'EXPIRED', 'REJECTED') " +
             "AND commandId NOT IN (" +
             "SELECT commandId FROM command_requests WHERE profileId = :profileId " +
+            "AND status IN ('COMPLETED', 'FAILED', 'EXPIRED', 'REJECTED') " +
             "ORDER BY createdAt DESC, commandId DESC LIMIT :keepMax)"
     )
     suspend fun pruneBeyond(profileId: String, keepMax: Int): Int

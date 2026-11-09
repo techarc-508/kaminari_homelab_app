@@ -108,9 +108,10 @@ interface MessageDao {
 
     @Query(
         "SELECT topic, COUNT(*) AS count FROM messages " +
-            "WHERE profileId = :profileId AND isRead = 0 GROUP BY topic"
+            "WHERE profileId = :profileId AND isRead = 0 GROUP BY topic " +
+            "ORDER BY count DESC, topic ASC LIMIT :limit"
     )
-    fun observeUnreadCounts(profileId: String): Flow<List<UnreadCount>>
+    fun observeUnreadCounts(profileId: String, limit: Int): Flow<List<UnreadCount>>
 
     @Query("UPDATE messages SET isRead = 1 WHERE profileId = :profileId AND messageId = :messageId")
     suspend fun markRead(profileId: String, messageId: String)

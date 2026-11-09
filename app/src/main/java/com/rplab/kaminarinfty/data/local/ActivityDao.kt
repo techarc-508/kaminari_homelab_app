@@ -17,6 +17,7 @@ interface ActivityDao {
     )
     fun observeRecent(profileId: String, limit: Int): Flow<List<ActivityEventEntity>>
 
+    /** Low-level retention query; normal callers use [prune]. */
     @Query("DELETE FROM activity_events WHERE profileId = :profileId AND createdAt < :cutoff")
     suspend fun pruneOlderThan(profileId: String, cutoff: Long): Int
 
@@ -27,9 +28,11 @@ interface ActivityDao {
     )
     suspend fun pruneBeyond(profileId: String, keepMax: Int): Int
 
+    /** Applies the approved 90-day / 5,000-event policy. */
     @Transaction
-    suspend fun prune(profileId: String, cutoff: Long, keepMax: Int): Int =
-        pruneOlderThan(profileId, cutoff) + pruneBeyond(profileId, keepMax)
+    suspend fun prune(profileId: String, now: Long): Int =
+        pruneOlderThan(profileId, RetentionPolicy.activityCutoff(now)) +
+            pruneBeyond(profileId, RetentionPolicy.ACTIVITY_MAX_EVENTS_PER_PROFILE)
 
     @Query("SELECT COUNT(*) FROM activity_events WHERE profileId = :profileId")
     suspend fun count(profileId: String): Int

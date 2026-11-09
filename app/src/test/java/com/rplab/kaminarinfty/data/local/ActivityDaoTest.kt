@@ -13,6 +13,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import java.util.concurrent.TimeUnit
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
@@ -79,20 +80,32 @@ class ActivityDaoTest {
     }
 
     @Test
-    fun `prune enforces age and row caps without touching other profiles`() = runTest {
+    fun `prune enforces the 90 day policy without touching other profiles`() = runTest {
         seedProfile("primary")
         seedProfile("secondary")
-        dao.insert(event("old", createdAt = 10))
-        dao.insert(event("keep1", createdAt = 20))
-        dao.insert(event("keep2", createdAt = 30))
-        dao.insert(event("keep3", createdAt = 40))
-        dao.insert(event("other", profileId = "secondary", createdAt = 10))
+        val now = TimeUnit.DAYS.toMillis(91)
+        dao.insert(event("old", createdAt = 1))
+        dao.insert(event("recent", createdAt = now - 1_000))
+        dao.insert(event("other", profileId = "secondary", createdAt = 1))
 
-        val removed = dao.prune("primary", cutoff = 15, keepMax = 2)
-        assertEquals(2, removed)
-        assertEquals(2, dao.count("primary"))
+        assertEquals(1, dao.prune("primary", now))
+        assertEquals(1, dao.count("primary"))
         assertEquals(1, dao.count("secondary"))
-        assertTrue(dao.observeRecent("primary", 10).first().map { it.id }.containsAll(listOf("keep2", "keep3")))
+        assertTrue(dao.observeRecent("primary", 10).first().map { it.id } == listOf("recent"))
+    }
+
+    @Test
+    fun `pruneBeyond keeps only the newest events per profile`() = runTest {
+        seedProfile("primary")
+        dao.insert(event("old", createdAt = 10))
+        dao.insert(event("mid", createdAt = 20))
+        dao.insert(event("new", createdAt = 30))
+
+        assertEquals(1, dao.pruneBeyond("primary", keepMax = 2))
+        assertEquals(2, dao.count("primary"))
+        assertTrue(
+            dao.observeRecent("primary", 10).first().map { it.id } == listOf("new", "mid")
+        )
     }
 
     @Test

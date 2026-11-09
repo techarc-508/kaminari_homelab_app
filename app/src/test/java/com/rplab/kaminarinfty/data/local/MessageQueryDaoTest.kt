@@ -122,7 +122,20 @@ class MessageQueryDaoTest {
         dao.insert(message("d", time = 4, topic = "alerts", read = true))
         dao.insert(message("e", time = 5, topic = "saved", saved = true, read = true))
 
-        val counts = dao.observeUnreadCounts("primary").first().associate { it.topic to it.count }
+        val counts = dao.observeUnreadCounts("primary", limit = 10).first().associate { it.topic to it.count }
         assertEquals(mapOf("ops" to 2, "alerts" to 1), counts)
+    }
+
+    @Test
+    fun `unread counts are bounded by the requested limit`() = runTest {
+        seedProfile()
+        dao.insert(message("a", time = 1, topic = "ops"))
+        dao.insert(message("b", time = 2, topic = "ops"))
+        dao.insert(message("c", time = 3, topic = "alerts"))
+
+        val counts = dao.observeUnreadCounts("primary", limit = 1).first()
+        assertEquals(1, counts.size)
+        assertEquals("ops", counts.single().topic)
+        assertEquals(2, counts.single().count)
     }
 }

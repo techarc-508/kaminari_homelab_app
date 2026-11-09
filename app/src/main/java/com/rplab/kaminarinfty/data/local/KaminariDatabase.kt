@@ -11,9 +11,9 @@ import androidx.sqlite.db.SupportSQLiteDatabase
  * Room is the single source of truth for notification history, topic
  * subscriptions and server profiles.
  *
- * v1 is the initial schema, so there is nothing to migrate yet. Destructive
- * migrations are intentionally NOT enabled: a future schema change must append
- * an explicit [MIGRATION] here (see AGENTS.md section 5).
+ * v1 is the initial schema. v2 adds the outbox, activity and command tables
+ * through [MIGRATION_1_2]. Destructive migrations are intentionally NOT enabled:
+ * future schema changes must append explicit migrations here (AGENTS.md §5).
  */
 @Database(
     entities = [

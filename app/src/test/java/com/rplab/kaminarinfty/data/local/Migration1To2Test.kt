@@ -8,6 +8,8 @@ import kotlinx.coroutines.test.runTest
 import org.json.JSONObject
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -97,9 +99,14 @@ class Migration1To2Test {
         try {
             assertEquals(2, database.openHelper.writableDatabase.version)
             assertEquals("Primary", database.serverProfileDao().getById("primary")!!.displayName)
-            assertEquals(listOf("ops"), database.topicSubscriptionDao().getForProfile("primary").map { it.topic })
+            val subscription = database.topicSubscriptionDao().getForProfile("primary").single()
+            assertEquals("ops", subscription.topic)
+            assertTrue(subscription.isSubscribed)
+            assertFalse(subscription.isPaused)
+            assertNull(subscription.priorityThreshold)
             val message = database.messageDao().getById("primary", "m1")!!
             assertEquals("Body", message.body)
+            assertFalse(message.isRead)
             assertTrue(message.isSaved)
             assertEquals(0, database.outboxDao().count("primary"))
             assertEquals(0, database.activityDao().count("primary"))

@@ -184,12 +184,13 @@ class NftyRepository(
                                 if (!event.canRetry) {
                                     _connectionState.value = when (event.category) {
                                         NftyErrorCategory.AUTH -> AuthState.AUTHENTICATION_FAILED
-                                        NftyErrorCategory.FORBIDDEN -> AuthState.PERMISSION_DENIED                            else -> AuthState.DISCONNECTED
-                        }
-                        terminal = true
-                        _isTerminal.value = true
-                    }
-                }
+                                        NftyErrorCategory.FORBIDDEN -> AuthState.PERMISSION_DENIED
+                                        else -> AuthState.DISCONNECTED
+                                    }
+                                    terminal = true
+                                    _isTerminal.value = true
+                                }
+                            }
                         }
                     }
 

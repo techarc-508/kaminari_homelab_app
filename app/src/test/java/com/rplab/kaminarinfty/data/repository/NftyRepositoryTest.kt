@@ -86,6 +86,26 @@ class NftyRepositoryTest {
     }
 
     @Test
+    fun `terminal forbidden errors map to permission denied`() = runTest {
+        val api = ScriptedApi(
+            listOf(listOf(NftyStreamEvent.Error(NftyErrorCategory.FORBIDDEN, "403", canRetry = false)))
+        )
+        val repository = NftyRepository(
+            api,
+            CoroutineScope(SupervisorJob() + StandardTestDispatcher(testScheduler)),
+        )
+
+        repository.startSubscription(config, listOf("ops"))
+        advanceUntilIdle()
+        advanceTimeBy(120_000)
+
+        assertEquals(1, api.calls)
+        assertEquals(AuthState.PERMISSION_DENIED, repository.connectionState.value)
+        assertTrue(repository.isTerminal.value)
+        repository.close()
+    }
+
+    @Test
     fun `arbitrary status codes are no longer treated as authentication`() = runTest {
         val api = ScriptedApi(
             listOf(listOf(NftyStreamEvent.Error(NftyErrorCategory.UNREACHABLE, "HTTP 418", canRetry = true)))

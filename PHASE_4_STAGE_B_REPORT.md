@@ -4,7 +4,7 @@
 **Repository:** `KaminariNfty_V1_Plan/repo/kaminari_homelab_app-main`
 **HEAD before Stage B:** `49e3159` — *Stage A.1: Room v2 persistence foundation hardening*
 **Scope:** publish-client foundation only (no outbox orchestration, no UI, no command execution)
-**Checkpoint commit:** recorded in `PHASE_4_STAGE_B_REPORT.md` at the follow-up docs commit
+**Checkpoint commit:** `675ec14` — *phase-4/stage-b: ntfy publish client with shared auth and validation*
 
 ---
 
@@ -214,8 +214,8 @@ Environment notes (not app defects):
 ## 6. Git checkpoint
 
 - Stage A.1 checkpoint (start of Stage B): `49e3159`.
-- Stage B code + docs checkpoint: reported after commit in the follow-up
-  documentation commit (this file is updated with the exact hash).
+- Stage B checkpoint: `675ec14`.
+- This report's hash update is a follow-up documentation commit.
 
 ---
 

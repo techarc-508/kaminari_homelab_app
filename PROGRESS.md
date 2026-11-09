@@ -130,8 +130,8 @@ MockWebServer only. No device available. See `PHASE_4_STAGE_B_REPORT.md`.
 - The handoff is `2fe0ce6`; the takeover report and documentation reconciliation
   are committed in `93c34d1`; the hygiene fix is `bc6b6cd`; decision cleanup is
   `4140ca0`.
-- Stage A is checkpointed in `db6e77a`; Stage A.1 in `49e3159`; Stage B code and
-  docs are checkpointed after this update (see `PHASE_4_STAGE_B_REPORT.md`).
+- Stage A is checkpointed in `db6e77a`; Stage A.1 in `49e3159`; Stage B in
+  `675ec14` (see `PHASE_4_STAGE_B_REPORT.md`).
 - Never reset/clean the repository; do not rewrite history.
 
 ## Next

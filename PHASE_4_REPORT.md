@@ -3,6 +3,7 @@
 **Status:** Stage A complete. Stages B–F not started.
 **Last updated:** 2026-11-09
 **Owner authorization:** Phase 4 approved for Stage A only (2026-11-09).
+**Stage A checkpoint:** `db6e77a`.
 
 This is the living Phase 4 report. Stage A has its own detailed report:
 `PHASE_4_STAGE_A_REPORT.md`. Later stages append here.

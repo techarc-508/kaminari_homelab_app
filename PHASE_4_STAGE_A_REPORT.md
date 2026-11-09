@@ -4,7 +4,7 @@
 **Date:** 2026-11-09
 **Owner authorization:** Phase 4 approved for Stage A only (2026-11-09).
 **Baseline before Stage A:** `586c165` on `main`, clean working tree.
-**Stage A checkpoint:** recorded in `CHANGELOG.md` after the checkpoint commit.
+**Stage A checkpoint:** `db6e77a`.
 
 ---
 

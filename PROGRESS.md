@@ -92,7 +92,7 @@ remains outstanding.
 - The handoff is `2fe0ce6`; the takeover report and documentation reconciliation
   are committed in `93c34d1`; the hygiene fix is `bc6b6cd`; decision cleanup is
   `4140ca0`.
-- Stage A is checkpointed in the commit recorded in `PHASE_4_STAGE_A_REPORT.md` (working tree clean after commit).
+- Stage A is checkpointed in `db6e77a`; the documentation hash update is a follow-up commit.
 - Never reset/clean the repository; do not rewrite history.
 
 ## Next

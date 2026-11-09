@@ -33,7 +33,7 @@ Append-only record of owner decisions and the technical choices that follow from
 
 ## Open decisions
 
-1. Whether to add notification actions (mark read/save) in Phase 4.
+1. Notification actions remain deferred by D-05; revisit only if the owner reopens it.
 2. Whether to pursue an FCM/UnifiedPush fallback (optional in PLAN).
 3. E-Ink profile specifics once the Boox model/firmware is known.
 4. Phase 4: approve JSON-root publish, `view`-only actions, manual-only outbox

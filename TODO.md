@@ -47,7 +47,6 @@ Phase 3 is accepted as **PASS WITH CONDITIONS**. These conditions are still open
 - [ ] Add a full service integration test for terminal stream failure once a profile/mock-stream harness exists.
 - [ ] Surface Battery Saver repeated-failure diagnostics in Settings.
 - [ ] `LOCKED_BOOT_COMPLETED` support if a credential-free boot path becomes necessary.
-- [ ] Fix the one-line `when` formatting in `NftyRepository.kt:187` and add a FORBIDDEN-mapping assertion (done during Phase 4 Stage B if touched; otherwise here).
 
 ## Phase 5 — low-end/E-Ink (NOT authorised)
 

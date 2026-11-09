@@ -4,7 +4,7 @@
 **Status:** Complete. Stage D not started.
 **Date:** 2026-11-10
 **Owner authorization:** Stage B accepted; Stage C explicitly authorized.
-**Checkpoint commit:** `__STAGE_C_HASH__` — *phase-4/stage-c: harden storage-failure handling*.
+**Checkpoint commit:** `85186f9` — *phase-4/stage-c: harden storage-failure handling*.
 **Schema:** Room v2 unchanged. No new entity, table, column or migration.
 
 ---
@@ -218,6 +218,6 @@ Stage C edits. Room schema `2.json` unchanged.
 
 ## 9. Checkpoint
 
-Stage C code, tests and documentation are checkpointed in `__STAGE_C_HASH__`.
+Stage C code, tests and documentation are checkpointed in `85186f9`.
 This report's hash update is a follow-up documentation commit. Stage D has not
 been started.

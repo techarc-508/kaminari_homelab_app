@@ -88,15 +88,15 @@ class RoomOutboxRepository(
         if (profileId.isBlank()) {
             return Result.failure(IllegalArgumentException("Select a server profile before publishing"))
         }
-        val config = profileRepository.loadConfig(profileId)
-            ?: return Result.failure(IllegalArgumentException("Unknown server profile"))
-        PublishValidator.validate(config, request)?.let { reason ->
-            return Result.failure(IllegalArgumentException(reason))
-        }
-
-        val clientId = UUID.randomUUID().toString()
-        val timestamp = now()
         return try {
+            val config = profileRepository.loadConfig(profileId)
+                ?: return Result.failure(IllegalArgumentException("Unknown server profile"))
+            PublishValidator.validate(config, request)?.let { reason ->
+                return Result.failure(IllegalArgumentException(reason))
+            }
+
+            val clientId = UUID.randomUUID().toString()
+            val timestamp = now()
             database.withTransaction {
                 outboxDao.insert(
                     OutboxEntryEntity(
@@ -145,17 +145,24 @@ class RoomOutboxRepository(
 
     override suspend fun send(profileId: String, clientId: String): SendOutcome {
         if (profileId.isBlank() || clientId.isBlank()) return SendOutcome.NotFound
+        return try {
+            // A row left SENDING by a dead process is uncertain, never resumable.
+            recoverStuck(profileId)
 
-        // A row left SENDING by a dead process is uncertain, never resumable.
-        recoverStuck(profileId)
+            val entry = outboxDao.getById(profileId, clientId) ?: return SendOutcome.NotFound
+            if (entry.profileId != profileId) return SendOutcome.NotFound
 
-        val entry = outboxDao.getById(profileId, clientId) ?: return SendOutcome.NotFound
-        if (entry.profileId != profileId) return SendOutcome.NotFound
-
-        if (outboxDao.claim(profileId, clientId, now()) == 0) return SendOutcome.Busy
-        val attempt = entry.attemptCount + 1
-        recordStarted(entry, attempt)
-        return publishClaimed(entry, attempt)
+            if (outboxDao.claim(profileId, clientId, now()) == 0) return SendOutcome.Busy
+            val attempt = entry.attemptCount + 1
+            recordStarted(entry, attempt)
+            publishClaimed(entry, attempt)
+        } catch (ce: CancellationException) {
+            throw ce
+        } catch (_: Exception) {
+            // Storage can fail before a claim (nothing was sent) or after one
+            // (the row stays SENDING and recovery will mark it AMBIGUOUS).
+            SendOutcome.Ambiguous("Local storage failed; the publish outcome is unknown")
+        }
     }
 
     override suspend fun retry(
@@ -164,79 +171,99 @@ class RoomOutboxRepository(
         allowAmbiguous: Boolean,
     ): SendOutcome {
         if (profileId.isBlank() || clientId.isBlank()) return SendOutcome.NotFound
-        val entry = outboxDao.getById(profileId, clientId) ?: return SendOutcome.NotFound
-        if (entry.profileId != profileId) return SendOutcome.NotFound
+        return try {
+            val entry = outboxDao.getById(profileId, clientId) ?: return SendOutcome.NotFound
+            if (entry.profileId != profileId) return SendOutcome.NotFound
 
-        when (OutboxState.fromPersisted(entry.state)) {
-            OutboxState.QUEUED -> {
-                // Another tap may have raced the first send; the claim decides.
-                recordRetry(entry, blocked = false)
-                return send(profileId, clientId)
-            }
-            OutboxState.SENDING -> return SendOutcome.Busy
-            OutboxState.ACCEPTED ->
-                return SendOutcome.Failed("Already accepted by the server", retryable = false)
-            OutboxState.FAILED -> {
-                if (!entry.retryable) {
-                    recordRetry(entry, blocked = true)
-                    return SendOutcome.Failed(
-                        "This failure is not retryable; create a new publish",
-                        retryable = false,
-                    )
+            when (OutboxState.fromPersisted(entry.state)) {
+                OutboxState.QUEUED -> {
+                    // Another tap may have raced the first send; the claim decides.
+                    recordRetry(entry, blocked = false)
+                    return send(profileId, clientId)
+                }
+                OutboxState.SENDING -> return SendOutcome.Busy
+                OutboxState.ACCEPTED ->
+                    return SendOutcome.Failed("Already accepted by the server", retryable = false)
+                OutboxState.FAILED -> {
+                    if (!entry.retryable) {
+                        recordRetry(entry, blocked = true)
+                        return SendOutcome.Failed(
+                            "This failure is not retryable; create a new publish",
+                            retryable = false,
+                        )
+                    }
+                }
+                OutboxState.AMBIGUOUS -> {
+                    if (!allowAmbiguous) {
+                        recordRetry(entry, blocked = true)
+                        return SendOutcome.ConfirmationRequired(
+                            "The server may already have accepted this publish; retrying could duplicate it",
+                        )
+                    }
                 }
             }
-            OutboxState.AMBIGUOUS -> {
-                if (!allowAmbiguous) {
-                    recordRetry(entry, blocked = true)
-                    return SendOutcome.ConfirmationRequired(
-                        "The server may already have accepted this publish; retrying could duplicate it",
-                    )
-                }
-            }
+
+            recordRetry(entry, blocked = false)
+            if (outboxDao.requeue(profileId, clientId, now()) == 0) return SendOutcome.Busy
+            send(profileId, clientId)
+        } catch (ce: CancellationException) {
+            throw ce
+        } catch (_: Exception) {
+            // No network call happens until the requeue succeeds.
+            SendOutcome.Failed("Local storage failed; retry was not started", retryable = true)
         }
-
-        recordRetry(entry, blocked = false)
-        if (outboxDao.requeue(profileId, clientId, now()) == 0) return SendOutcome.Busy
-        return send(profileId, clientId)
     }
 
     override suspend fun cancel(profileId: String, clientId: String): Boolean {
         if (profileId.isBlank() || clientId.isBlank()) return false
-        return outboxDao.deleteIfUnsent(profileId, clientId) > 0
+        return try {
+            outboxDao.deleteIfUnsent(profileId, clientId) > 0
+        } catch (ce: CancellationException) {
+            throw ce
+        } catch (_: Exception) {
+            false
+        }
     }
 
     override suspend fun recoverStuck(profileId: String): Int {
         if (profileId.isBlank()) return 0
-        val timestamp = now()
-        val cutoff = timestamp - STUCK_SENDING_TIMEOUT_MS
-        val stale = outboxDao.getStuckSending(profileId, cutoff)
-        if (stale.isEmpty()) return 0
+        return try {
+            val timestamp = now()
+            val cutoff = timestamp - STUCK_SENDING_TIMEOUT_MS
+            val stale = outboxDao.getStuckSending(profileId, cutoff)
+            if (stale.isEmpty()) return 0
 
-        val recovered = database.withTransaction {
-            val rows = outboxDao.recoverStuckSending(profileId, cutoff, timestamp, STUCK_REASON)
-            if (rows > 0) {
-                stale.forEach { candidate ->
-                    val current = outboxDao.getById(profileId, candidate.clientId) ?: return@forEach
-                    if (OutboxState.fromPersisted(current.state) != OutboxState.AMBIGUOUS) return@forEach
-                    if (current.lastError != STUCK_REASON) return@forEach
-                    activityDao.insert(
-                        event(
-                            entryId = candidate.clientId,
-                            profileId = profileId,
-                            type = ActivityType.PUBLISH_AMBIGUOUS,
-                            severity = ActivitySeverity.WARNING,
-                            summary = "Publish to ${candidate.topic} was interrupted; outcome unknown",
-                            topic = candidate.topic,
-                            eventId = "outbox:${candidate.clientId}:recovered",
-                            timestamp = timestamp,
+            val recovered = database.withTransaction {
+                val rows = outboxDao.recoverStuckSending(profileId, cutoff, timestamp, STUCK_REASON)
+                if (rows > 0) {
+                    stale.forEach { candidate ->
+                        val current = outboxDao.getById(profileId, candidate.clientId) ?: return@forEach
+                        if (OutboxState.fromPersisted(current.state) != OutboxState.AMBIGUOUS) return@forEach
+                        if (current.lastError != STUCK_REASON) return@forEach
+                        activityDao.insert(
+                            event(
+                                entryId = candidate.clientId,
+                                profileId = profileId,
+                                type = ActivityType.PUBLISH_AMBIGUOUS,
+                                severity = ActivitySeverity.WARNING,
+                                summary = "Publish to ${candidate.topic} was interrupted; outcome unknown",
+                                topic = candidate.topic,
+                                eventId = "outbox:${candidate.clientId}:recovered",
+                                timestamp = timestamp,
+                            )
                         )
-                    )
+                    }
                 }
+                rows
             }
-            rows
+            if (recovered > 0) activityRepository.prune(profileId)
+            recovered
+        } catch (ce: CancellationException) {
+            throw ce
+        } catch (_: Exception) {
+            // Rows stay SENDING; a later recovery pass can safely try again.
+            0
         }
-        if (recovered > 0) activityRepository.prune(profileId)
-        return recovered
     }
 
     override suspend fun prune(profileId: String) {

@@ -138,6 +138,9 @@ MockWebServer only. No device available. See `PHASE_4_STAGE_B_REPORT.md`.
   refused. No automatic retry or resend path exists.
 - `SENDING` rows older than two minutes become `AMBIGUOUS`, never `QUEUED`, both
   at app start and before an explicit send.
+- Local storage failures are returned as typed outcomes (`Result.failure` for
+  enqueue, `Ambiguous` for send, `Failed(retryable=true)` for retry); a claimed
+  row stays `SENDING` for recovery rather than being reported as sent.
 - Retention uses `RetentionPolicy`: activity 90 days / 5,000 per profile;
   outbox 30 days / 500 terminal rows per profile. Active `QUEUED`/`SENDING` work
   is never pruned.
@@ -147,14 +150,14 @@ MockWebServer only. No device available. See `PHASE_4_STAGE_B_REPORT.md`.
   repository and constructs the activity/outbox repositories. No database,
   entity or migration change.
 
-**Tests added:** 44 — `OutboxRepositoryTest` 27, `ActivityRepositoryTest` 9,
+**Tests added:** 46 — `OutboxRepositoryTest` 29, `ActivityRepositoryTest` 9,
 `MessageRepositoryActivityTest` 4, `OutboxIntegrationTest` 4.
 
 **Verified (final code):**
 
 ```text
-./gradlew testDebugUnitTest --rerun-tasks  # exit 0 — 284 tests, 0 failures, 2 pre-existing skips
-./gradlew assembleDebug                    # exit 0 — app-debug.apk 19,720,707 bytes
+./gradlew testDebugUnitTest --rerun-tasks  # exit 0 — 286 tests, 0 failures, 2 pre-existing skips
+./gradlew assembleDebug                    # exit 0 — app-debug.apk 19,777,789 bytes
 ./gradlew lintDebug                        # exit 0 — 0 errors, 56 warnings
 ```
 
@@ -180,7 +183,7 @@ Real-server and hardware verification remain outstanding. See
   are committed in `93c34d1`; the hygiene fix is `bc6b6cd`; decision cleanup is
   `4140ca0`.
 - Stage A is checkpointed in `db6e77a`; Stage A.1 in `49e3159`; Stage B in
-  `675ec14`; Stage C in `d56dd17` (see `PHASE_4_STAGE_C_REPORT.md`).
+  `675ec14`; Stage C in `__STAGE_C_HASH__` (see `PHASE_4_STAGE_C_REPORT.md`).
 - Never reset/clean the repository; do not rewrite history.
 
 ## Next

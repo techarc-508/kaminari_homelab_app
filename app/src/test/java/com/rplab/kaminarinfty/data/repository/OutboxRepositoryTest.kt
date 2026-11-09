@@ -1,6 +1,7 @@
 package com.rplab.kaminarinfty.data.repository
 
 import android.content.Context
+import android.database.sqlite.SQLiteException
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import com.rplab.kaminarinfty.data.api.PublishRequest
@@ -557,10 +558,40 @@ class OutboxRepositoryTest {
         assertEquals(listOf("warning"), stored.tags)
     }
 
+    @Test
+    fun `enqueue reports a local storage failure without writing`() = runTest {
+        profiles.loadFailure = SQLiteException("disk I/O")
+
+        val result = outbox.enqueue("primary", request)
+
+        assertTrue(result.isFailure)
+        assertEquals(0, database.outboxDao().count("primary"))
+        assertEquals(0, published.size)
+    }
+
+    @Test
+    fun `storage failure during send is typed and leaves the row recoverable`() = runTest {
+        val clientId = outbox.enqueue("primary", request).getOrThrow()
+        profiles.loadFailure = SQLiteException("disk I/O")
+
+        val outcome = outbox.send("primary", clientId)
+
+        assertTrue(outcome is SendOutcome.Ambiguous)
+        assertEquals("SENDING", row(clientId)!!.state)
+        assertEquals(0, published.size)
+    }
+
     private class MapProfileRepository(
         private val configs: Map<String, ServerConfig>,
     ) : ProfileRepository by FakeProfileRepository() {
-        override suspend fun loadConfig(profileId: String): ServerConfig? = configs[profileId]
+        /** Simulates a local database failure when loading the profile. */
+        var loadFailure: Exception? = null
+
+        override suspend fun loadConfig(profileId: String): ServerConfig? {
+            loadFailure?.let { throw it }
+            return configs[profileId]
+        }
+
         override suspend fun loadActiveConfig(): ServerConfig? = configs.values.firstOrNull()
     }
 }

@@ -4,7 +4,7 @@
 **Status:** Complete. Stage D not started.
 **Date:** 2026-11-10
 **Owner authorization:** Stage B accepted; Stage C explicitly authorized.
-**Checkpoint commit:** `d56dd17` — *phase-4/stage-c: add durable outbox and activity orchestration*.
+**Checkpoint commit:** `__STAGE_C_HASH__` — *phase-4/stage-c: harden storage-failure handling*.
 **Schema:** Room v2 unchanged. No new entity, table, column or migration.
 
 ---
@@ -101,6 +101,10 @@ Invariants:
 - `attemptCount` increments only on a successful claim.
 - Cancellation (`CancellationException`) is rethrown without inventing a result;
   the row stays `SENDING` until recovery.
+- Local storage failures return a typed outcome instead of crashing: `enqueue`
+  returns `Result.failure`, `send` returns `Ambiguous` (a claimed row stays
+  `SENDING` for recovery), and `retry` returns `Failed(retryable=true)` because
+  no network call happens before the requeue succeeds.
 - No retry loop, scheduler or hidden background resend exists.
 
 ## 4. Manual retry and ambiguous outcomes
@@ -173,12 +177,12 @@ workaround only; no project build file was changed):
 
 ```text
 ./gradlew testDebugUnitTest --rerun-tasks
-# exit 0 — 284 tests, 0 failures, 0 errors, 2 pre-existing skips
-#   Stage C adds 44: OutboxRepository 27, ActivityRepository 9,
+# exit 0 — 286 tests, 0 failures, 0 errors, 2 pre-existing skips
+#   Stage C adds 46: OutboxRepository 29, ActivityRepository 9,
 #   MessageRepositoryActivity 4, OutboxIntegration 4
 
 ./gradlew assembleDebug
-# exit 0 — app-debug.apk, 19,720,707 bytes
+# exit 0 — app-debug.apk, 19,777,789 bytes
 
 ./gradlew lintDebug
 # exit 0 — 0 errors, 56 warnings (unchanged baseline)
@@ -214,6 +218,6 @@ Stage C edits. Room schema `2.json` unchanged.
 
 ## 9. Checkpoint
 
-Stage C code, tests and documentation are checkpointed in `d56dd17`. This
-report's hash update is a follow-up documentation commit. Stage D has not been
-started.
+Stage C code, tests and documentation are checkpointed in `__STAGE_C_HASH__`.
+This report's hash update is a follow-up documentation commit. Stage D has not
+been started.

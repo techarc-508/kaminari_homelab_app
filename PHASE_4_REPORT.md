@@ -81,6 +81,8 @@ Full detail: `PHASE_4_STAGE_B_REPORT.md`.
 - Retrying `AMBIGUOUS` requires an explicit confirmation and reuses the original
   row, preserving its attempt history. Non-retryable failures are refused.
 - `SENDING` rows older than two minutes become `AMBIGUOUS`, never `QUEUED`.
+- Local storage failures become typed outcomes; a claimed row stays `SENDING`
+  for recovery instead of being reported as sent.
 - `ActivityRepository` records queued, started, accepted, failed, ambiguous and
   retry events with deterministic IDs and sanitized summaries; message bodies,
   titles and credentials never enter the timeline.
@@ -105,12 +107,12 @@ Full detail: `PHASE_4_STAGE_C_REPORT.md`.
 # exit 0 — 36 tests, 0 failures, 0 errors, 0 skipped
 
 ./gradlew testDebugUnitTest --rerun-tasks
-# exit 0 — 284 tests, 0 failures, 0 errors, 2 pre-existing skips
-#   (Stage C adds 44: OutboxRepository 27, ActivityRepository 9,
+# exit 0 — 286 tests, 0 failures, 0 errors, 2 pre-existing skips
+#   (Stage C adds 46: OutboxRepository 29, ActivityRepository 9,
 #    MessageRepositoryActivity 4, OutboxIntegration 4; Stage B added 39)
 
 ./gradlew assembleDebug
-# exit 0 — app-debug.apk, 19,720,707 bytes
+# exit 0 — app-debug.apk, 19,777,789 bytes
 
 ./gradlew lintDebug
 # exit 0 — 0 errors, 56 warnings

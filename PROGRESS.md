@@ -180,7 +180,7 @@ Real-server and hardware verification remain outstanding. See
   are committed in `93c34d1`; the hygiene fix is `bc6b6cd`; decision cleanup is
   `4140ca0`.
 - Stage A is checkpointed in `db6e77a`; Stage A.1 in `49e3159`; Stage B in
-  `675ec14`; Stage C in `__STAGE_C_HASH__` (see `PHASE_4_STAGE_C_REPORT.md`).
+  `675ec14`; Stage C in `d56dd17` (see `PHASE_4_STAGE_C_REPORT.md`).
 - Never reset/clean the repository; do not rewrite history.
 
 ## Next

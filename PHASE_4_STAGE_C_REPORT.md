@@ -4,7 +4,7 @@
 **Status:** Complete. Stage D not started.
 **Date:** 2026-11-10
 **Owner authorization:** Stage B accepted; Stage C explicitly authorized.
-**Checkpoint commit:** recorded in the follow-up documentation commit.
+**Checkpoint commit:** `d56dd17` — *phase-4/stage-c: add durable outbox and activity orchestration*.
 **Schema:** Room v2 unchanged. No new entity, table, column or migration.
 
 ---
@@ -214,5 +214,6 @@ Stage C edits. Room schema `2.json` unchanged.
 
 ## 9. Checkpoint
 
-Stage C code, tests and documentation are checkpointed in the commit recorded by
-the follow-up documentation update. Stage D has not been started.
+Stage C code, tests and documentation are checkpointed in `d56dd17`. This
+report's hash update is a follow-up documentation commit. Stage D has not been
+started.

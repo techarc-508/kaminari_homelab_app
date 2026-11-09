@@ -1,13 +1,18 @@
 package com.rplab.kaminarinfty
 
 import com.rplab.kaminarinfty.data.SampleDataProvider
+import com.rplab.kaminarinfty.delivery.DeliveryEngine
+import com.rplab.kaminarinfty.delivery.DeliveryPhase
+import com.rplab.kaminarinfty.delivery.DeliveryStatusStore
 import com.rplab.kaminarinfty.model.AuthMethod
 import com.rplab.kaminarinfty.model.AuthState
+import com.rplab.kaminarinfty.model.DeliveryMode
 import com.rplab.kaminarinfty.model.NftyErrorCategory
 import com.rplab.kaminarinfty.model.NftyException
 import com.rplab.kaminarinfty.model.NftyMessage
 import com.rplab.kaminarinfty.model.ServerConfig
 import com.rplab.kaminarinfty.model.StreamUpdate
+import com.rplab.kaminarinfty.testing.FakeDeliveryController
 import com.rplab.kaminarinfty.testing.FakeMessageRepository
 import com.rplab.kaminarinfty.testing.FakePreferences
 import com.rplab.kaminarinfty.testing.FakeProfileRepository
@@ -34,6 +39,8 @@ class MainViewModelTest {
     private lateinit var messages: FakeMessageRepository
     private lateinit var profiles: FakeProfileRepository
     private lateinit var stream: FakeStreamRepository
+    private lateinit var delivery: FakeDeliveryController
+    private lateinit var deliveryStatus: DeliveryStatusStore
 
     @Before
     fun setUp() {
@@ -41,12 +48,16 @@ class MainViewModelTest {
         messages = FakeMessageRepository()
         profiles = FakeProfileRepository()
         stream = FakeStreamRepository()
+        delivery = FakeDeliveryController()
+        deliveryStatus = DeliveryStatusStore()
         profiles.onSetActive = { id ->
             preferences.state.value = preferences.state.value.copy(activeProfileId = id)
         }
     }
 
-    private fun buildViewModel() = MainViewModel(messages, profiles, preferences, stream)
+    private fun buildViewModel() = MainViewModel(
+        messages, profiles, preferences, stream, delivery, deliveryStatus,
+    )
 
     private fun liveMessage(id: String = "live_1") = NftyMessage(
         id = id,
@@ -353,6 +364,229 @@ class MainViewModelTest {
             assertEquals(
                 "Secure credential storage is unavailable",
                 vm.uiState.value.customErrorMessage,
+            )
+        }
+
+    // ---- Phase 3: delivery modes and notifications --------------------------
+
+    @Test
+    fun `delivery mode defaults to battery saver and channels are created`() = runTest(mainRule.dispatcher) {
+        val vm = buildViewModel()
+        advanceUntilIdle()
+
+        assertEquals(DeliveryMode.BATTERY_SAVER, vm.uiState.value.deliveryMode)
+        assertEquals(DeliveryMode.BATTERY_SAVER, preferences.state.value.deliveryMode)
+        assertEquals(1, delivery.channelsEnsured)
+    }
+
+    @Test
+    fun `instant mode stops the in-app stream and starts the foreground service`() =
+        runTest(mainRule.dispatcher) {
+            preferences.state.value = preferences.state.value.copy(activeProfileId = "primary")
+            profiles.config = ServerConfig(serverUrl = "https://ntfy.test", authMethod = AuthMethod.GUEST)
+            profiles.subscribedNames = listOf("ops")
+            val vm = buildViewModel()
+            advanceUntilIdle()
+            val startsBefore = stream.startCalls.size
+            val stopsBefore = stream.stopCalls
+
+            vm.setDeliveryMode(DeliveryMode.INSTANT)
+            advanceUntilIdle()
+
+            assertEquals(DeliveryMode.INSTANT, preferences.state.value.deliveryMode)
+            assertEquals(DeliveryMode.INSTANT, vm.uiState.value.deliveryMode)
+            assertTrue(delivery.instantStarts >= 1)
+            assertTrue(stream.stopCalls > stopsBefore)
+            assertEquals(startsBefore, stream.startCalls.size)
+            assertTrue(delivery.batteryCancels >= 1)
+        }
+
+    @Test
+    fun `battery saver mode schedules periodic work and resumes the in-app stream`() =
+        runTest(mainRule.dispatcher) {
+            preferences.state.value = preferences.state.value.copy(activeProfileId = "primary")
+            profiles.config = ServerConfig(serverUrl = "https://ntfy.test", authMethod = AuthMethod.GUEST)
+            profiles.subscribedNames = listOf("ops")
+            val vm = buildViewModel()
+            advanceUntilIdle()
+
+            vm.setDeliveryMode(DeliveryMode.BATTERY_SAVER)
+            advanceUntilIdle()
+
+            assertEquals(DeliveryMode.BATTERY_SAVER, preferences.state.value.deliveryMode)
+            assertTrue(delivery.batterySchedules >= 1)
+            assertTrue(delivery.instantStops >= 1)
+            assertTrue(stream.startCalls.isNotEmpty())
+        }
+
+    @Test
+    fun `instant mode at startup starts the service without opening an in-app stream`() =
+        runTest(mainRule.dispatcher) {
+            preferences.state.value = preferences.state.value.copy(
+                activeProfileId = "primary",
+                deliveryMode = DeliveryMode.INSTANT,
+            )
+            profiles.config = ServerConfig(serverUrl = "https://ntfy.test", authMethod = AuthMethod.GUEST)
+            profiles.subscribedNames = listOf("ops")
+
+            val vm = buildViewModel()
+            advanceUntilIdle()
+
+            assertEquals(DeliveryMode.INSTANT, vm.uiState.value.deliveryMode)
+            assertTrue(delivery.instantStarts >= 1)
+            assertTrue(stream.startCalls.isEmpty())
+        }
+
+    @Test
+    fun `received messages post notifications outside instant mode`() = runTest(mainRule.dispatcher) {
+        preferences.state.value = preferences.state.value.copy(activeProfileId = "primary")
+        profiles.config = ServerConfig(serverUrl = "https://ntfy.test", authMethod = AuthMethod.GUEST)
+        val vm = buildViewModel()
+        advanceUntilIdle()
+
+        stream.emit(liveMessage())
+        advanceUntilIdle()
+
+        assertEquals(listOf("live_1"), delivery.notified.map { it.id })
+        assertEquals(DeliveryMode.BATTERY_SAVER, vm.uiState.value.deliveryMode)
+    }
+
+    @Test
+    fun `instant mode never double-posts notifications from the view model`() =
+        runTest(mainRule.dispatcher) {
+            preferences.state.value = preferences.state.value.copy(
+                activeProfileId = "primary",
+                deliveryMode = DeliveryMode.INSTANT,
+            )
+            profiles.config = ServerConfig(serverUrl = "https://ntfy.test", authMethod = AuthMethod.GUEST)
+            profiles.subscribedNames = listOf("ops")
+            val vm = buildViewModel()
+            advanceUntilIdle()
+
+            stream.emit(liveMessage())
+            advanceUntilIdle()
+
+            assertTrue(delivery.instantStarts >= 1)
+            assertTrue(delivery.notified.isEmpty())
+        }
+
+    @Test
+    fun `a failed instant start is surfaced instead of claiming success`() =
+        runTest(mainRule.dispatcher) {
+            delivery.startResult = false
+            preferences.state.value = preferences.state.value.copy(activeProfileId = "primary")
+            profiles.config = ServerConfig(serverUrl = "https://ntfy.test", authMethod = AuthMethod.GUEST)
+
+            val vm = buildViewModel()
+            advanceUntilIdle()
+
+            vm.setDeliveryMode(DeliveryMode.INSTANT)
+            advanceUntilIdle()
+
+            assertTrue(vm.uiState.value.bannerMessage.orEmpty().contains("could not start"))
+        }
+
+    @Test
+    fun `notification deep link opens the matching message detail`() = runTest(mainRule.dispatcher) {
+        preferences.state.value = preferences.state.value.copy(activeProfileId = "primary")
+        profiles.config = ServerConfig(serverUrl = "https://ntfy.test", authMethod = AuthMethod.GUEST)
+        messages.flow.value = listOf(liveMessage())
+        val vm = buildViewModel()
+        advanceUntilIdle()
+
+        vm.openMessageFromNotification("live_1")
+        advanceUntilIdle()
+
+        assertEquals(AppDestination.DETAIL, vm.uiState.value.currentDestination)
+        assertEquals("live_1", vm.uiState.value.selectedMessage?.id)
+    }
+
+    @Test
+    fun `unknown notification deep link reports instead of opening an empty detail`() =
+        runTest(mainRule.dispatcher) {
+            preferences.state.value = preferences.state.value.copy(activeProfileId = "primary")
+            profiles.config = ServerConfig(serverUrl = "https://ntfy.test", authMethod = AuthMethod.GUEST)
+            val vm = buildViewModel()
+            advanceUntilIdle()
+
+            vm.openMessageFromNotification("missing")
+            advanceUntilIdle()
+
+            assertTrue(
+                vm.uiState.value.bannerMessage.orEmpty().contains("no longer in local history")
+            )
+            assertEquals(AppDestination.INBOX, vm.uiState.value.currentDestination)
+        }
+
+    @Test
+    fun `cold start deep link loads a persisted message outside the in-memory window`() =
+        runTest(mainRule.dispatcher) {
+            preferences.state.value = preferences.state.value.copy(activeProfileId = "primary")
+            profiles.config = ServerConfig(serverUrl = "https://ntfy.test", authMethod = AuthMethod.GUEST)
+            val target = liveMessage(id = "cold_target")
+            messages.stored += target
+            // Simulate a cold start: Room has the row, the displayed window is empty.
+            messages.flow.value = emptyList()
+
+            val vm = buildViewModel()
+            advanceUntilIdle()
+            assertTrue(vm.uiState.value.messages.isEmpty())
+
+            vm.openMessageFromNotification("cold_target")
+            advanceUntilIdle()
+
+            assertEquals(AppDestination.DETAIL, vm.uiState.value.currentDestination)
+            assertEquals("cold_target", vm.uiState.value.selectedMessage?.id)
+        }
+
+    @Test
+    fun `instant mode reflects live service state without opening a second stream`() =
+        runTest(mainRule.dispatcher) {
+            preferences.state.value = preferences.state.value.copy(
+                activeProfileId = "primary",
+                deliveryMode = DeliveryMode.INSTANT,
+            )
+            profiles.config = ServerConfig(serverUrl = "https://ntfy.test", authMethod = AuthMethod.GUEST)
+            profiles.subscribedNames = listOf("ops")
+            val vm = buildViewModel()
+            advanceUntilIdle()
+
+            deliveryStatus.publish(
+                engine = DeliveryEngine.INSTANT,
+                phase = DeliveryPhase.LIVE,
+                topicCount = 1,
+                authState = AuthState.AUTHENTICATED,
+            )
+            advanceUntilIdle()
+
+            assertEquals(AuthState.AUTHENTICATED, vm.uiState.value.authState)
+            assertEquals(DeliveryPhase.LIVE, vm.uiState.value.deliveryStatus.phase)
+            assertEquals(0, stream.startCalls.size)
+        }
+
+    @Test
+    fun `terminal service state is surfaced with the service's own reason`() =
+        runTest(mainRule.dispatcher) {
+            preferences.state.value = preferences.state.value.copy(
+                activeProfileId = "primary",
+                deliveryMode = DeliveryMode.INSTANT,
+            )
+            profiles.config = ServerConfig(serverUrl = "https://ntfy.test", authMethod = AuthMethod.GUEST)
+            profiles.subscribedNames = listOf("ops")
+            val vm = buildViewModel()
+            advanceUntilIdle()
+
+            deliveryStatus.publish(
+                engine = DeliveryEngine.INSTANT,
+                phase = DeliveryPhase.TIMED_OUT,
+                detail = "Android reached its 6-hour dataSync limit",
+            )
+            advanceUntilIdle()
+
+            assertEquals(AuthState.DISCONNECTED, vm.uiState.value.authState)
+            assertEquals(
+                "Android reached its 6-hour dataSync limit",
+                vm.uiState.value.bannerMessage,
             )
         }
 }

@@ -76,6 +76,15 @@ class NftyRepository(
     private val _lastError = MutableStateFlow<Pair<NftyErrorCategory, String>?>(null)
     override val lastError: StateFlow<Pair<NftyErrorCategory, String>?> = _lastError.asStateFlow()
 
+    /**
+     * True once the subscription has permanently stopped: terminal auth/access
+     * failure, no topics, or the bounded unproductive-retry limit. Background
+     * owners observe this so they can stop instead of showing a false "live"
+     * indicator. Reset by the next [startSubscription].
+     */
+    private val _isTerminal = MutableStateFlow(false)
+    val isTerminal: StateFlow<Boolean> = _isTerminal.asStateFlow()
+
     private val _updates = MutableSharedFlow<StreamUpdate>(extraBufferCapacity = 128)
     override val updates: SharedFlow<StreamUpdate> = _updates.asSharedFlow()
 
@@ -101,6 +110,7 @@ class NftyRepository(
         sinceProvider: suspend () -> String,
     ) {
         stopSubscription()
+        _isTerminal.value = false
 
         val activeTopics = topics.map { it.trim() }.filter { it.isNotBlank() }
         if (activeTopics.isEmpty()) {
@@ -109,6 +119,7 @@ class NftyRepository(
                 NftyErrorCategory.UNREACHABLE,
                 "No topics configured for subscription",
             )
+            _isTerminal.value = true
             return
         }
         synchronized(recentIds) { recentIds.clear() }
@@ -173,12 +184,12 @@ class NftyRepository(
                                 if (!event.canRetry) {
                                     _connectionState.value = when (event.category) {
                                         NftyErrorCategory.AUTH -> AuthState.AUTHENTICATION_FAILED
-                                        NftyErrorCategory.FORBIDDEN -> AuthState.PERMISSION_DENIED
-                                        else -> AuthState.DISCONNECTED
-                                    }
-                                    terminal = true
-                                }
-                            }
+                                        NftyErrorCategory.FORBIDDEN -> AuthState.PERMISSION_DENIED                            else -> AuthState.DISCONNECTED
+                        }
+                        terminal = true
+                        _isTerminal.value = true
+                    }
+                }
                         }
                     }
 
@@ -216,6 +227,7 @@ class NftyRepository(
                             "Server keeps sending unreadable stream data — stopped retrying",
                         )
                         _connectionState.value = AuthState.DISCONNECTED
+                        _isTerminal.value = true
                         break
                     }
                 } else {

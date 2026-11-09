@@ -59,6 +59,7 @@ class NftyRepositoryTest {
 
         assertTrue("expected retries, got ${api.calls}", api.calls >= 2)
         assertEquals(AuthState.RECONNECTING, repository.connectionState.value)
+        assertTrue("retriable errors must not be terminal", !repository.isTerminal.value)
         repository.close()
     }
 
@@ -78,6 +79,9 @@ class NftyRepositoryTest {
 
         assertEquals(1, api.calls)
         assertEquals(AuthState.AUTHENTICATION_FAILED, repository.connectionState.value)
+        // Background owners (InstantForegroundService) observe this to stop the
+        // service instead of leaving a "live delivery" notification over a dead stream.
+        assertTrue(repository.isTerminal.value)
         repository.close()
     }
 

@@ -28,7 +28,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -39,6 +38,7 @@ import androidx.compose.ui.unit.sp
 import com.rplab.kaminarinfty.model.AuthState
 import com.rplab.kaminarinfty.ui.theme.KaminariTheme
 import com.rplab.kaminarinfty.ui.theme.RubikFontFamily
+import kotlinx.coroutines.delay
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -58,15 +58,16 @@ fun NftyTopBar(
     // Injectable so the ticking behaviour is testable without wall-clock sleeps.
     nowMillis: () -> Long = { System.currentTimeMillis() },
 ) {
-    // Live clock restored after the phase 2 gate (G-08). A frame callback runs
-    // while this composable is visible, but state only changes once per second
-    // so the low-RAM/E-Ink cost stays at one small recomposition per second.
-    // The coroutine is cancelled automatically when the composition leaves.
+    // Live clock restored after the phase 2 gate (G-08). Sleeps until the next
+    // second boundary instead of requesting a frame per frame, so the
+    // low-RAM/E-Ink cost is one small recomposition per second rather than a
+    // wake-up on every frame. Cancelled automatically when the composition
+    // leaves.
     val clockMillis by produceState(initialValue = nowMillis()) {
         while (true) {
-            withFrameNanos { }
             val now = nowMillis()
-            if (now - value >= 1_000L) value = now
+            value = now
+            delay((1_000L - now % 1_000L).coerceAtLeast(16L))
         }
     }
     val timeFormat = remember { SimpleDateFormat("hh:mm:ss a", Locale.getDefault()) }

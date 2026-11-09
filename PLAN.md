@@ -370,7 +370,9 @@ Deliver:
 - Lifecycle, Doze, process death, reboot and network transition handling.
 - Optional FCM/UnifiedPush feasibility spike; do not block core release on it.
 
-Gate: documented delivery guarantees and device test matrix; no claim of guaranteed instant background delivery unless proven.
+Gate: documented delivery guarantees and device test matrix; no claim of guaranteed instant background delivery unless proven. **Authorized by owner review**
+
+Status (2026-11-09, remediated): implemented and independently re-audited — see `PHASE_3_REPORT.md`, `PHASE_3_REMEDIATION_REPORT.md`, `PHASE_3_FINAL_AUDIT.md`. Delivery modes are now exactly Instant and Battery Saver (legacy `SAVED` migrates to Battery Saver). Android 15 `onTimeout` stops the service before the fatal deadline and falls back to Battery Saver; terminal stream failures stop the service with an honest notification; Instant status is service-owned and visible to the UI; cold-start deep links load by ID from Room. `testDebugUnitTest` 173 tests / 0 failures / 2 pre-existing skips, `assembleDebug` SUCCESS (19,557,690 B), `lint` 0 errors / 56 warnings. Device test matrix (Doze, reboot, Android 15 timeout, OEM battery managers) still pending; Phase 4 awaits explicit owner approval.
 
 ### Phase 4 — Compose, activity and command centre
 

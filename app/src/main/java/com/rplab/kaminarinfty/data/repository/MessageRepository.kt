@@ -18,6 +18,9 @@ interface MessageRepository {
 
     suspend fun exists(profileId: String, messageId: String): Boolean
 
+    /** Direct lookup for notification deep links, independent of the paging window. */
+    suspend fun getById(profileId: String, messageId: String): NftyMessage?
+
     /** Newest message ID, used as the ntfy `since` cursor after a reconnect. */
     suspend fun latestCursor(profileId: String): String?
 
@@ -51,6 +54,9 @@ class RoomMessageRepository(database: KaminariDatabase) : MessageRepository {
 
     override suspend fun exists(profileId: String, messageId: String): Boolean =
         dao.exists(profileId, messageId)
+
+    override suspend fun getById(profileId: String, messageId: String): NftyMessage? =
+        dao.getById(profileId, messageId)?.let(MessageMapper::toDomain)
 
     override suspend fun latestCursor(profileId: String): String? =
         dao.latestMessageId(profileId)

@@ -12,6 +12,12 @@ import com.rplab.kaminarinfty.data.repository.MessageRepository
 import com.rplab.kaminarinfty.data.repository.NftyRepository
 import com.rplab.kaminarinfty.data.repository.ProfileRepository
 import com.rplab.kaminarinfty.data.repository.RoomMessageRepository
+import com.rplab.kaminarinfty.delivery.AndroidDeliveryController
+import com.rplab.kaminarinfty.delivery.DeliveryController
+import com.rplab.kaminarinfty.delivery.DeliveryStatusStore
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 
 /** Minimal manual DI container; one instance per process. */
 class AppContainer(context: Context) {
@@ -22,6 +28,17 @@ class AppContainer(context: Context) {
     val profileRepository: ProfileRepository =
         DefaultProfileRepository(database, secretStore, preferences)
     val streamRepository: NftyRepository = NftyRepository()
+    val deliveryController: DeliveryController = AndroidDeliveryController(context)
+
+    /** Process-wide delivery state shared by the service, receiver and ViewModel. */
+    val deliveryStatusStore: DeliveryStatusStore = DeliveryStatusStore()
+
+    /**
+     * App-owned scope for short, bounded background work (boot restore and the
+     * Instant timeout fallback). SupervisorJob keeps one failure from cancelling
+     * unrelated work; it lives for the process, not for a screen.
+     */
+    val appScope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 }
 
 class KaminariApp : Application() {

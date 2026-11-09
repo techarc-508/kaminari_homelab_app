@@ -7,8 +7,10 @@ import com.rplab.kaminarinfty.data.repository.MessageRepository
 import com.rplab.kaminarinfty.data.repository.ProfileRepository
 import com.rplab.kaminarinfty.data.repository.ProfileSaveResult
 import com.rplab.kaminarinfty.data.repository.StreamRepository
+import com.rplab.kaminarinfty.delivery.DeliveryController
 import com.rplab.kaminarinfty.ThemeSetting
 import com.rplab.kaminarinfty.model.AuthMethod
+import com.rplab.kaminarinfty.model.DeliveryMode
 import com.rplab.kaminarinfty.model.AuthState
 import com.rplab.kaminarinfty.model.NftyErrorCategory
 import com.rplab.kaminarinfty.model.NftyMessage
@@ -50,6 +52,10 @@ class FakePreferences : AppPreferences {
     override suspend fun clearActiveProfileId() {
         state.update { it.copy(activeProfileId = null) }
     }
+
+    override suspend fun setDeliveryMode(mode: DeliveryMode) {
+        state.update { it.copy(deliveryMode = mode) }
+    }
 }
 
 class FakeMessageRepository : MessageRepository {
@@ -77,6 +83,9 @@ class FakeMessageRepository : MessageRepository {
 
     override suspend fun exists(profileId: String, messageId: String): Boolean =
         stored.any { it.id == messageId }
+
+    override suspend fun getById(profileId: String, messageId: String): NftyMessage? =
+        stored.firstOrNull { it.id == messageId }
 
     override suspend fun latestCursor(profileId: String): String? =
         stored.maxByOrNull { it.time }?.id
@@ -270,4 +279,44 @@ class FakeStreamRepository : StreamRepository {
     }
 
     override fun close() = Unit
+}
+
+class FakeDeliveryController : DeliveryController {
+    var channelsEnsured = 0
+    var instantStarts = 0
+    var instantStops = 0
+    var batterySchedules = 0
+    var batteryCancels = 0
+    var resumeNotices = 0
+    var startResult = true
+    val notified = mutableListOf<NftyMessage>()
+
+    override fun ensureNotificationChannels() {
+        channelsEnsured++
+    }
+
+    override fun startInstant(): Boolean {
+        instantStarts++
+        return startResult
+    }
+
+    override fun stopInstant() {
+        instantStops++
+    }
+
+    override fun scheduleBatterySaver() {
+        batterySchedules++
+    }
+
+    override fun cancelBatterySaver() {
+        batteryCancels++
+    }
+
+    override fun postInstantResumeNotification() {
+        resumeNotices++
+    }
+
+    override fun postMessageNotification(message: NftyMessage) {
+        notified += message
+    }
 }

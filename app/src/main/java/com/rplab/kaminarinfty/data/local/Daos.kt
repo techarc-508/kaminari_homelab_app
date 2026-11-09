@@ -74,6 +74,12 @@ interface MessageDao {
     )
     suspend fun exists(profileId: String, messageId: String): Boolean
 
+    /** Deep-link lookup by message ID, independent of the bounded inbox window. */
+    @Query(
+        "SELECT * FROM messages WHERE profileId = :profileId AND messageId = :messageId LIMIT 1"
+    )
+    suspend fun getById(profileId: String, messageId: String): MessageEntity?
+
     @Query("SELECT COUNT(*) FROM messages WHERE profileId = :profileId")
     suspend fun countForProfile(profileId: String): Int
 

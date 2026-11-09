@@ -43,6 +43,8 @@ import androidx.compose.ui.unit.sp
 import com.rplab.kaminarinfty.BuildConfig
 import com.rplab.kaminarinfty.ThemeSetting
 import com.rplab.kaminarinfty.model.AuthState
+import com.rplab.kaminarinfty.delivery.DeliveryStatus
+import com.rplab.kaminarinfty.model.DeliveryMode
 import com.rplab.kaminarinfty.model.ServerConfig
 import com.rplab.kaminarinfty.model.ServerProfile
 import com.rplab.kaminarinfty.ui.components.NftyTopBar
@@ -73,6 +75,11 @@ fun SettingsScreen(
     onClearHistory: () -> Unit,
     onClearSaved: () -> Unit,
     onToggleSampleData: (Boolean) -> Unit,
+    deliveryMode: DeliveryMode,
+    deliveryStatus: DeliveryStatus,
+    notificationsEnabled: Boolean,
+    onSelectDeliveryMode: (DeliveryMode) -> Unit,
+    onOpenNotificationSettings: () -> Unit,
     onSearchClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -323,25 +330,119 @@ fun SettingsScreen(
                 }
             }
 
-            // Section 4: NOTIFICATIONS & DELIVERY (honest phase status)
+            // Section 4: NOTIFICATIONS & DELIVERY (owner-selected modes)
             SettingsSectionCard(title = "NOTIFICATIONS & DELIVERY", icon = Icons.Default.Notifications) {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(6.dp))
-                            .background(KaminariTheme.colors.surfaceSecondary)
-                            .padding(10.dp)
-                    ) {
+                    if (!notificationsEnabled) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(6.dp))
+                                .background(KaminariTheme.colors.surfaceSecondary)
+                                .padding(10.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(
+                                text = "System notifications are blocked. Android will not show message alerts until you allow them.",
+                                modifier = Modifier.weight(1f),
+                                fontFamily = JetBrainsMonoFontFamily,
+                                fontSize = 10.sp,
+                                color = KaminariTheme.colors.textSecondary,
+                                lineHeight = 14.sp,
+                            )
+                            OutlinedButton(
+                                onClick = onOpenNotificationSettings,
+                                shape = RoundedCornerShape(6.dp),
+                                border = androidx.compose.foundation.BorderStroke(1.dp, KaminariTheme.colors.border),
+                                modifier = Modifier.testTag("open_notification_settings"),
+                            ) {
+                                Text("Allow", fontFamily = RubikFontFamily, fontSize = 11.sp, color = KaminariTheme.colors.textPrimary)
+                            }
+                        }
+                    }
+
+                    DeliveryMode.values().forEach { mode ->
+                        val isSelected = deliveryMode == mode
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(
+                                    if (isSelected) KaminariTheme.colors.accent.copy(alpha = 0.12f)
+                                    else KaminariTheme.colors.surfaceSecondary
+                                )
+                                .border(
+                                    1.dp,
+                                    if (isSelected) KaminariTheme.colors.accent else KaminariTheme.colors.border,
+                                    RoundedCornerShape(8.dp),
+                                )
+                                .clickable { onSelectDeliveryMode(mode) }
+                                .padding(10.dp)
+                                .testTag("delivery_mode_${mode.name}"),
+                            verticalArrangement = Arrangement.spacedBy(3.dp),
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Text(
+                                    text = mode.label,
+                                    fontFamily = RubikFontFamily,
+                                    fontSize = 13.sp,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                    color = KaminariTheme.colors.textPrimary,
+                                )
+                                if (isSelected) {
+                                    Text(
+                                        text = "ACTIVE",
+                                        fontFamily = JetBrainsMonoFontFamily,
+                                        fontSize = 9.sp,
+                                        color = KaminariTheme.colors.accent,
+                                    )
+                                }
+                            }
+                            Text(
+                                text = mode.summary,
+                                fontFamily = RubikFontFamily,
+                                fontSize = 11.sp,
+                                color = KaminariTheme.colors.textPrimary,
+                            )
+                            Text(
+                                text = mode.tradeoff,
+                                fontFamily = JetBrainsMonoFontFamily,
+                                fontSize = 9.sp,
+                                color = KaminariTheme.colors.textSecondary,
+                                lineHeight = 13.sp,
+                            )
+                        }
+                    }
+
+                    if (deliveryMode == DeliveryMode.INSTANT) {
                         Text(
-                            text = "Background delivery is not implemented yet. The live stream currently runs only while the app is in the foreground. " +
-                                "Instant and Battery Saver modes with Android system notifications are scheduled for the delivery phase.",
+                            text = "STATUS // ${deliveryStatus.displayText()}",
+                            modifier = Modifier.testTag("delivery_status_text"),
                             fontFamily = JetBrainsMonoFontFamily,
                             fontSize = 10.sp,
-                            color = KaminariTheme.colors.textSecondary,
+                            color = if (deliveryStatus.isTerminal) {
+                                KaminariTheme.colors.warning
+                            } else {
+                                KaminariTheme.colors.textSecondary
+                            },
                             lineHeight = 14.sp,
                         )
                     }
+
+                    Text(
+                        text = "Android, Doze and device power management can interrupt any background mode. " +
+                            "No mode guarantees instant delivery; Instant uses a visible persistent notification. " +
+                            "Android 15+ limits dataSync services to 6 hours per 24 hours.",
+                        fontFamily = JetBrainsMonoFontFamily,
+                        fontSize = 9.sp,
+                        color = KaminariTheme.colors.textSecondary,
+                        lineHeight = 13.sp,
+                    )
                 }
             }
 

@@ -9,7 +9,11 @@ import com.rplab.kaminarinfty.data.preferences.AppPreferences
 import com.rplab.kaminarinfty.data.repository.MessageRepository
 import com.rplab.kaminarinfty.data.repository.ProfileRepository
 import com.rplab.kaminarinfty.data.repository.StreamRepository
+import com.rplab.kaminarinfty.delivery.DeliveryController
+import com.rplab.kaminarinfty.delivery.DeliveryStatus
+import com.rplab.kaminarinfty.delivery.DeliveryStatusStore
 import com.rplab.kaminarinfty.model.AuthState
+import com.rplab.kaminarinfty.model.DeliveryMode
 import com.rplab.kaminarinfty.model.NftyErrorCategory
 import com.rplab.kaminarinfty.model.NftyException
 import com.rplab.kaminarinfty.model.NftyMessage
@@ -22,6 +26,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -75,6 +80,9 @@ data class MainUiState(
     val lastCursor: String? = null,
     val urlToConfirm: String? = null,
     val bannerMessage: String? = null,
+    val deliveryMode: DeliveryMode = DeliveryMode.DEFAULT,
+    /** Service-owned state while Instant mode is selected. */
+    val deliveryStatus: DeliveryStatus = DeliveryStatus(),
 )
 
 class MainViewModel(
@@ -82,6 +90,8 @@ class MainViewModel(
     private val profileRepository: ProfileRepository,
     private val preferences: AppPreferences,
     private val streamRepository: StreamRepository,
+    private val deliveryController: DeliveryController,
+    private val deliveryStatusStore: DeliveryStatusStore = DeliveryStatusStore(),
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(MainUiState())
@@ -96,8 +106,11 @@ class MainViewModel(
     private var profileJob: Job? = null
     private var preferencesLoaded = false
     private var newestStoredTime: Long = 0L
+    private var lastAppliedDeliveryMode: DeliveryMode? = null
+    private var lastStatusNoticeSequence: Long = 0L
 
     init {
+        deliveryController.ensureNotificationChannels()
         // Set initial UI state from preferences defaults immediately.
         // This ensures the state is correct even before the preferences Flow emits.
         _uiState.update {
@@ -121,11 +134,18 @@ class MainViewModel(
                         isCompactDensity = prefs.isCompact,
                         sampleDataEnabled = prefs.sampleDataEnabled,
                         activeProfileId = prefs.activeProfileId,
+                        deliveryMode = prefs.deliveryMode,
                     )
                 }
                 if (!preferencesLoaded || profileChanged) {
                     preferencesLoaded = true
                     bindProfile(prefs.activeProfileId)
+                }
+                if (lastAppliedDeliveryMode != prefs.deliveryMode) {
+                    lastAppliedDeliveryMode = prefs.deliveryMode
+                    // Startup: bindProfile owns the foreground stream, so only the
+                    // durable background engine is reconciled here.
+                    applyDeliveryMode(prefs.deliveryMode, fromUser = false)
                 }
                 refreshDisplayedData()
             }
@@ -139,10 +159,33 @@ class MainViewModel(
 
         viewModelScope.launch {
             streamRepository.connectionState.collect { state ->
+                // Instant mode is owned by the foreground service; the ViewModel
+                // must not report its own stopped stream as the app's status.
+                if (_uiState.value.deliveryMode == DeliveryMode.INSTANT) return@collect
                 // Only update authState if there's an active profile;
                 // otherwise keep NOT_CONFIGURED until a profile is bound.
                 val newAuthState = if (activeProfileId != null) state else AuthState.NOT_CONFIGURED
                 _uiState.update { it.copy(authState = newAuthState) }
+            }
+        }
+
+        viewModelScope.launch {
+            deliveryStatusStore.status.collect { status ->
+                val instant = _uiState.value.deliveryMode == DeliveryMode.INSTANT
+                _uiState.update { current ->
+                    current.copy(
+                        deliveryStatus = status,
+                        authState = if (instant) status.toAuthState() else current.authState,
+                    )
+                }
+                // Surface each terminal service event once, using the service's
+                // own reason rather than a generic "offline" label.
+                if (instant && status.isTerminal && status.sequence != lastStatusNoticeSequence) {
+                    lastStatusNoticeSequence = status.sequence
+                    _uiState.update {
+                        it.copy(bannerMessage = status.detail ?: status.displayText())
+                    }
+                }
             }
         }
 
@@ -177,9 +220,16 @@ class MainViewModel(
                         // Real data must never hide behind the demo dataset.
                         if (sampleDataEnabled) preferences.setSampleDataEnabled(false)
                         val inserted = messageRepository.store(profileId, update.message)
-                        if (inserted && update.message.time >= newestStoredTime) {
-                            newestStoredTime = update.message.time
-                            _uiState.update { it.copy(lastCursor = update.message.id) }
+                        if (inserted) {
+                            // In Instant mode the foreground service is the single
+                            // notification owner; posting here would duplicate it.
+                            if (_uiState.value.deliveryMode != DeliveryMode.INSTANT) {
+                                deliveryController.postMessageNotification(update.message)
+                            }
+                            if (update.message.time >= newestStoredTime) {
+                                newestStoredTime = update.message.time
+                                _uiState.update { it.copy(lastCursor = update.message.id) }
+                            }
                         }
                     }
                     is StreamUpdate.Removed ->
@@ -212,6 +262,8 @@ class MainViewModel(
             dbMessages = emptyList()
             dbTopics = emptyList()
             streamRepository.stopSubscription()
+            deliveryController.stopInstant()
+            deliveryController.cancelBatterySaver()
             _uiState.update {
                 it.copy(
                     authState = AuthState.NOT_CONFIGURED,
@@ -265,6 +317,22 @@ class MainViewModel(
     private suspend fun syncLiveStream(config: ServerConfig, force: Boolean = false) {
         val profileId = activeProfileId ?: return
         val subscribed = profileRepository.subscribedTopicNames(profileId).sorted()
+
+        // Instant mode: the foreground service owns the stream (and notifications).
+        // Restart it only when the durable subscription set changed.
+        if (_uiState.value.deliveryMode == DeliveryMode.INSTANT) {
+            if (force || subscribed != activeTopics) {
+                activeTopics = subscribed
+                if (subscribed.isEmpty()) {
+                    deliveryController.stopInstant()
+                } else if (!deliveryController.startInstant()) {
+                    _uiState.update {
+                        it.copy(bannerMessage = "Instant mode could not start — reopen the app and try again")
+                    }
+                }
+            }
+            return
+        }
 
         if (!force && subscribed == activeTopics) return
         activeTopics = subscribed
@@ -473,6 +541,81 @@ class MainViewModel(
             return "Credentials are required for ${config.authMethod.displayName}"
         }
         return null
+    }
+
+    // ---- Delivery modes -----------------------------------------------------
+
+    /** Switches the background delivery engine and persists the choice. */
+    fun setDeliveryMode(mode: DeliveryMode) {
+        if (mode == _uiState.value.deliveryMode) return
+        lastAppliedDeliveryMode = mode
+        val message = when (mode) {
+            DeliveryMode.INSTANT -> "Instant mode on — live connection with a visible notification"
+            DeliveryMode.BATTERY_SAVER -> "Battery Saver on — periodic checks, delivery is delayed"
+        }
+        _uiState.update { it.copy(deliveryMode = mode, bannerMessage = message) }
+        viewModelScope.launch {
+            preferences.setDeliveryMode(mode)
+            applyDeliveryMode(mode, fromUser = true)
+        }
+    }
+
+    private fun applyDeliveryMode(mode: DeliveryMode, fromUser: Boolean) {
+        when (mode) {
+            DeliveryMode.INSTANT -> {
+                deliveryController.cancelBatterySaver()
+                streamRepository.stopSubscription()
+                activeTopics = emptyList()
+                _uiState.update {
+                    it.copy(authState = deliveryStatusStore.status.value.toAuthState())
+                }
+                if (fromUser && !deliveryController.startInstant()) {
+                    _uiState.update {
+                        it.copy(bannerMessage = "Instant mode could not start — reopen the app and try again")
+                    }
+                }
+            }
+            DeliveryMode.BATTERY_SAVER -> {
+                deliveryController.stopInstant()
+                deliveryController.scheduleBatterySaver()
+                if (fromUser) resumeForegroundStream()
+            }
+        }
+    }
+
+    /** Re-opens the in-app stream after leaving Instant mode. */
+    private fun resumeForegroundStream() {
+        if (activeProfileId == null) return
+        viewModelScope.launch {
+            activeTopics = emptyList()
+            syncLiveStream(_uiState.value.serverConfig, force = true)
+        }
+    }
+
+    /**
+     * Opens the message behind a notification. Cold starts begin with an empty
+     * in-memory history, so a cache miss falls back to a direct Room lookup by ID
+     * instead of reporting a false "outside the loaded window" error.
+     */
+    fun openMessageFromNotification(messageId: String) {
+        viewModelScope.launch {
+            val profileId = activeProfileId ?: preferences.data.first().activeProfileId
+            if (profileId == null) {
+                _uiState.update {
+                    it.copy(bannerMessage = "Notification opened before a server profile was configured")
+                }
+                return@launch
+            }
+            val cached = _uiState.value.messages.firstOrNull { it.id == messageId }
+            val message = cached ?: messageRepository.getById(profileId, messageId)
+            if (message == null) {
+                _uiState.update {
+                    it.copy(bannerMessage = "Notification is no longer in local history")
+                }
+                return@launch
+            }
+            openMessageDetail(message)
+        }
     }
 
     fun retryLiveStream() {
@@ -735,5 +878,7 @@ class MainViewModelFactory(
         profileRepository = container.profileRepository,
         preferences = container.preferences,
         streamRepository = container.streamRepository,
+        deliveryController = container.deliveryController,
+        deliveryStatusStore = container.deliveryStatusStore,
     ) as T
 }

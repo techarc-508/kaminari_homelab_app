@@ -185,6 +185,18 @@ class MessageDaoTest {
     }
 
     @Test
+    fun `getById resolves a cold-start deep link outside the recent window`() = runTest {
+        seedProfile()
+        dao.insert(message("old_target", 1_000))
+        (1..30).forEach { dao.insert(message("new_$it", 2_000L + it)) }
+
+        val found = dao.getById("primary", "old_target")
+        assertEquals("body old_target", found?.body)
+        assertEquals(null, dao.getById("primary", "missing"))
+        assertEquals(null, dao.getById("other_profile", "old_target"))
+    }
+
+    @Test
     fun `clearTopicKeepingSaved only deletes unsaved rows in the topic`() = runTest {
         seedProfile()
         dao.insert(message("m1", 1000).copy(topic = "ops"))

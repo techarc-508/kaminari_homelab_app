@@ -1,11 +1,17 @@
 package com.rplab.kaminarinfty
 
+import android.Manifest
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
+import android.provider.Settings
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
@@ -15,14 +21,23 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.core.app.NotificationManagerCompat
+import androidx.core.content.ContextCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.rplab.kaminarinfty.delivery.NftyNotifier
 import com.rplab.kaminarinfty.ui.components.NftyConfirmationSheet
 import com.rplab.kaminarinfty.ui.navigation.NftyBottomNavigationBar
 import com.rplab.kaminarinfty.ui.screens.InboxScreen
@@ -36,13 +51,45 @@ import com.rplab.kaminarinfty.ui.theme.KaminariTheme
 import com.rplab.kaminarinfty.ui.theme.MyApplicationTheme
 
 class MainActivity : ComponentActivity() {
+
+    /** Message ID from a notification tap, consumed once the UI is ready. */
+    private val pendingMessageId = mutableStateOf<String?>(null)
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        pendingMessageId.value = intent?.getStringExtra(NftyNotifier.EXTRA_MESSAGE_ID)
+        intent?.removeExtra(NftyNotifier.EXTRA_MESSAGE_ID)
         setContent {
             val container = (application as KaminariApp).container
             val mainViewModel: MainViewModel = viewModel(factory = MainViewModelFactory(container))
             val uiState by mainViewModel.uiState.collectAsStateWithLifecycle()
+            val context = LocalContext.current
+            val notificationsEnabled = rememberNotificationsEnabled()
+
+            // Android 13+ runtime permission, requested once a profile exists.
+            val permissionLauncher = rememberLauncherForActivityResult(
+                ActivityResultContracts.RequestPermission()
+            ) { /* Denial is surfaced in Settings; delivery keeps working in-app. */ }
+            LaunchedEffect(uiState.activeProfileId) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+                    uiState.activeProfileId != null &&
+                    ContextCompat.checkSelfPermission(
+                        context,
+                        Manifest.permission.POST_NOTIFICATIONS,
+                    ) != PackageManager.PERMISSION_GRANTED
+                ) {
+                    permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                }
+            }
+
+            // Deep link from a message notification.
+            LaunchedEffect(pendingMessageId.value) {
+                pendingMessageId.value?.let { messageId ->
+                    mainViewModel.openMessageFromNotification(messageId)
+                    pendingMessageId.value = null
+                }
+            }
 
             val isDarkTheme = when (uiState.themeSetting) {
                 ThemeSetting.SYSTEM -> isSystemInDarkTheme()
@@ -55,10 +102,51 @@ class MainActivity : ComponentActivity() {
                     viewModel = mainViewModel,
                     uiState = uiState,
                     isDarkTheme = isDarkTheme,
+                    notificationsEnabled = notificationsEnabled,
+                    onOpenNotificationSettings = {
+                        // Per-app notification settings only exist on API 26+;
+                        // older devices fall back to the app details page.
+                        val settingsIntent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                            Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+                                .putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
+                        } else {
+                            Intent(
+                                Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                                Uri.fromParts("package", context.packageName, null),
+                            )
+                        }
+                        runCatching { context.startActivity(settingsIntent) }
+                    },
                 )
             }
         }
     }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        pendingMessageId.value = intent.getStringExtra(NftyNotifier.EXTRA_MESSAGE_ID)
+        intent.removeExtra(NftyNotifier.EXTRA_MESSAGE_ID)
+    }
+}
+
+@Composable
+private fun rememberNotificationsEnabled(): Boolean {
+    val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
+    var enabled by remember {
+        mutableStateOf(NotificationManagerCompat.from(context).areNotificationsEnabled())
+    }
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                enabled = NotificationManagerCompat.from(context).areNotificationsEnabled()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+    return enabled
 }
 
 @Composable
@@ -66,6 +154,8 @@ fun KaminariApp(
     viewModel: MainViewModel,
     uiState: MainUiState,
     isDarkTheme: Boolean,
+    notificationsEnabled: Boolean,
+    onOpenNotificationSettings: () -> Unit,
 ) {
     val context = LocalContext.current
     val snackbarHostState = remember { SnackbarHostState() }
@@ -229,6 +319,11 @@ fun KaminariApp(
                         onClearHistory = { viewModel.clearHistory() },
                         onClearSaved = { viewModel.clearSaved() },
                         onToggleSampleData = { viewModel.setSampleDataEnabled(it) },
+                        deliveryMode = uiState.deliveryMode,
+                        deliveryStatus = uiState.deliveryStatus,
+                        notificationsEnabled = notificationsEnabled,
+                        onSelectDeliveryMode = { viewModel.setDeliveryMode(it) },
+                        onOpenNotificationSettings = onOpenNotificationSettings,
                         onSearchClick = { viewModel.navigateTo(AppDestination.SEARCH) },
                     )
                 }

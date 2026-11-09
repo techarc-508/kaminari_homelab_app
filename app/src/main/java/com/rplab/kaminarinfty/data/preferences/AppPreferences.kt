@@ -6,6 +6,7 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.rplab.kaminarinfty.ThemeSetting
+import com.rplab.kaminarinfty.model.DeliveryMode
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
@@ -15,6 +16,7 @@ data class AppPreferencesData(
     val isCompact: Boolean = false,
     val sampleDataEnabled: Boolean = false,
     val activeProfileId: String? = null,
+    val deliveryMode: DeliveryMode = DeliveryMode.DEFAULT,
 )
 
 /** Non-secret user preferences only. Secrets live in [SecretStore]. */
@@ -27,6 +29,7 @@ interface AppPreferences {
     suspend fun setSampleDataEnabled(enabled: Boolean)
     suspend fun setActiveProfileId(id: String)
     suspend fun clearActiveProfileId()
+    suspend fun setDeliveryMode(mode: DeliveryMode)
 }
 
 private val Context.settingsDataStore by preferencesDataStore(name = "kaminari_settings")
@@ -38,6 +41,7 @@ class DataStoreAppPreferences(private val context: Context) : AppPreferences {
         val COMPACT = booleanPreferencesKey("compact_density")
         val SAMPLE_DATA = booleanPreferencesKey("sample_data_enabled")
         val ACTIVE_PROFILE = stringPreferencesKey("active_profile_id")
+        val DELIVERY_MODE = stringPreferencesKey("delivery_mode")
     }
 
     override val data: Flow<AppPreferencesData> = context.settingsDataStore.data.map { prefs ->
@@ -48,6 +52,8 @@ class DataStoreAppPreferences(private val context: Context) : AppPreferences {
             isCompact = prefs[Keys.COMPACT] ?: false,
             sampleDataEnabled = prefs[Keys.SAMPLE_DATA] ?: false,
             activeProfileId = prefs[Keys.ACTIVE_PROFILE],
+            // Legacy `SAVED` values are migrated to BATTERY_SAVER by fromPersisted.
+            deliveryMode = DeliveryMode.fromPersisted(prefs[Keys.DELIVERY_MODE]),
         )
     }
 
@@ -72,5 +78,9 @@ class DataStoreAppPreferences(private val context: Context) : AppPreferences {
 
     override suspend fun clearActiveProfileId() {
         context.settingsDataStore.edit { it.remove(Keys.ACTIVE_PROFILE) }
+    }
+
+    override suspend fun setDeliveryMode(mode: DeliveryMode) {
+        context.settingsDataStore.edit { it[Keys.DELIVERY_MODE] = mode.name }
     }
 }

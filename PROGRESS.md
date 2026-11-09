@@ -237,7 +237,7 @@ No device/emulator or real-server validation is available. See
   are committed in `93c34d1`; the hygiene fix is `bc6b6cd`; decision cleanup is
   `4140ca0`.
 - Stage A is checkpointed in `db6e77a`; Stage A.1 in `49e3159`; Stage B in
-  `675ec14`; Stage C in `85186f9`; Stage D in `4747786` (see
+  `675ec14`; Stage C in `85186f9`; Stage D in `56e68eb` (see
   `PHASE_4_STAGE_D_REPORT.md`).
 - Never reset/clean the repository; do not rewrite history.
 

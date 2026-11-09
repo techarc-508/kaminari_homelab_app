@@ -196,11 +196,11 @@ engine was added.
 
 ## 10. Tests added
 
-36 new tests, all on final code:
+37 new tests, all on final code:
 
 | Area | Tests |
 |---|---|
-| `PublishViewModelTest` | 9 — validation, invalid URL, accepted, failed with draft preservation, ambiguous confirmation, double-tap, outbox ambiguous retry, cancel, profile-switch draft clear. |
+| `PublishViewModelTest` | 10 — validation, invalid URL, accepted, failed with draft preservation, ambiguous confirmation, double-tap, outbox ambiguous retry, cancel, profile-switch draft clear, in-flight result blocked after a profile switch. |
 | `ActivityViewModelTest` | 6 — load, all filters, profile rebind, no-profile idle. |
 | `MainViewModelTest` | 3 — safe switch keeps history, URL preview counts/keep, new-profile secret re-entry guard. |
 | `PublishScreenTest` | 5 — form/acceptance note, validation, ambiguous warning, accepted wording, advanced fields. |
@@ -220,7 +220,7 @@ workaround only; no project build file was changed):
 
 ```text
 ./gradlew testDebugUnitTest --rerun-tasks
-# exit 0 — 322 tests, 0 failures, 0 errors, 2 pre-existing skips
+# exit 0 — 323 tests, 0 failures, 0 errors, 2 pre-existing skips
 
 ./gradlew assembleDebug
 # exit 0 — app-debug.apk, 19,950,553 bytes

@@ -139,8 +139,8 @@ Full detail: `PHASE_4_STAGE_D_REPORT.md`.
 # exit 0 — 36 tests, 0 failures, 0 errors, 0 skipped
 
 ./gradlew testDebugUnitTest --rerun-tasks
-# exit 0 — 322 tests, 0 failures, 0 errors, 2 pre-existing skips
-#   (Stage D adds 36; Stage C added 46; Stage B added 39)
+# exit 0 — 323 tests, 0 failures, 0 errors, 2 pre-existing skips
+#   (Stage D adds 37; Stage C added 46; Stage B added 39)
 
 ./gradlew assembleDebug
 # exit 0 — app-debug.apk, 19,950,553 bytes

@@ -168,6 +168,35 @@ class PublishViewModelTest {
     }
 
     @Test
+    fun `in-flight send cannot leak its result into a newly selected profile`() =
+        runTest(mainRule.dispatcher) {
+            val gate = CompletableDeferred<Unit>()
+            outbox.sendGate = gate
+            outbox.sendOutcomes.add(SendOutcome.Accepted("old-profile-server"))
+            val vm = buildViewModel()
+            advanceUntilIdle()
+            vm.fillValidDraft()
+
+            vm.send()
+            runCurrent()
+            assertEquals(1, outbox.sendCalls.size)
+
+            profiles.activeFlow.value = "secondary"
+            runCurrent()
+            assertEquals("secondary", vm.uiState.value.activeProfileId)
+
+            gate.complete(Unit)
+            advanceUntilIdle()
+
+            assertNull(vm.uiState.value.outcome)
+            assertEquals("secondary", vm.uiState.value.activeProfileId)
+            assertEquals(1, outbox.sendCalls.size)
+            vm.retryLast()
+            advanceUntilIdle()
+            assertEquals(1, outbox.sendCalls.size)
+        }
+
+    @Test
     fun `outbox ambiguous row also asks before retry`() = runTest(mainRule.dispatcher) {
         outbox.entries.value = listOf(ambiguousEntry())
         val vm = buildViewModel()

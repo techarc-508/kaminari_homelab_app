@@ -203,7 +203,7 @@ Real-server and hardware verification remain outstanding. See
 - No new dependency, migration, schema change, command execution or binary
   upload. Stage E remains unimplemented.
 
-**Tests added:** 36 — `PublishViewModelTest` 9, `ActivityViewModelTest` 6,
+**Tests added:** 37 — `PublishViewModelTest` 10, `ActivityViewModelTest` 6,
 `MainViewModelTest` 3, `PublishScreenTest` 5, `OutboxScreenTest` 4,
 `ActivityScreenTest` 3, `SettingsScreenTest` 3, `InboxScreenTest` 2,
 `BottomNavigationBarTest` 1.
@@ -211,7 +211,7 @@ Real-server and hardware verification remain outstanding. See
 **Verified (final code):**
 
 ```text
-./gradlew testDebugUnitTest --rerun-tasks  # exit 0 — 322 tests, 0 failures, 0 errors, 2 pre-existing skips
+./gradlew testDebugUnitTest --rerun-tasks  # exit 0 — 323 tests, 0 failures, 0 errors, 2 pre-existing skips
 ./gradlew assembleDebug                    # exit 0 — app-debug.apk 19,950,553 bytes
 ./gradlew lintDebug                        # exit 0 — 0 errors, 56 warnings
 ```

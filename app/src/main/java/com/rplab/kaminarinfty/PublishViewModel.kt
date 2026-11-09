@@ -202,16 +202,23 @@ class PublishViewModel(
         viewModelScope.launch {
             val enqueued = outboxRepository.enqueue(profileId, request)
             val clientId = enqueued.getOrElse { failure ->
-                _uiState.update {
-                    it.copy(
-                        isSending = false,
-                        validationError = failure.message ?: "Could not queue the publish",
-                    )
+                if (_uiState.value.activeProfileId == profileId) {
+                    _uiState.update {
+                        it.copy(
+                            isSending = false,
+                            validationError = failure.message ?: "Could not queue the publish",
+                        )
+                    }
                 }
                 return@launch
             }
-            lastClientId = clientId
             val outcome = outboxRepository.send(profileId, clientId)
+            // The row belongs to the original profile. If the user switched while
+            // the request was in flight, its result must not surface as the new
+            // profile's outcome; the persisted outbox row will be read when that
+            // profile is active again.
+            if (_uiState.value.activeProfileId != profileId) return@launch
+            lastClientId = clientId
             applySendOutcome(outcome, clientId, clearDraftOnAccepted = true)
         }
     }
@@ -240,6 +247,7 @@ class PublishViewModel(
         _uiState.update { it.copy(isSending = true, notice = null) }
         viewModelScope.launch {
             val outcome = outboxRepository.retry(profileId, clientId, allowAmbiguous)
+            if (_uiState.value.activeProfileId != profileId) return@launch
             if (clientId == lastClientId) {
                 applySendOutcome(outcome, clientId, clearDraftOnAccepted = false)
             } else {
@@ -268,6 +276,7 @@ class PublishViewModel(
         val profileId = _uiState.value.activeProfileId ?: return
         viewModelScope.launch {
             val removed = outboxRepository.cancel(profileId, clientId)
+            if (_uiState.value.activeProfileId != profileId) return@launch
             if (clientId == lastClientId) lastClientId = null
             _uiState.update {
                 it.copy(

@@ -1,12 +1,13 @@
 # Phase 4 Report — Compose, Activity and Command Centre
 
-**Status:** Stage A complete. Stages B–F not started.
-**Last updated:** 2026-11-09
-**Owner authorization:** Phase 4 approved for Stage A only (2026-11-09).
-**Stage A checkpoint:** `db6e77a`.
+**Status:** Stage B complete. Stages C–F not started.
+**Last updated:** 2026-11-10
+**Owner authorization:** Stage A approved 2026-11-09; Stage B authorised 2026-11-10.
+**Stage A checkpoint:** `db6e77a`. **Stage A.1:** `49e3159`.
 
 This is the living Phase 4 report. Stage A has its own detailed report:
-`PHASE_4_STAGE_A_REPORT.md`. Later stages append here.
+`PHASE_4_STAGE_A_REPORT.md`; Stage B has `PHASE_4_STAGE_B_REPORT.md`. Later
+stages append here.
 
 ---
 
@@ -15,7 +16,7 @@ This is the living Phase 4 report. Stage A has its own detailed report:
 | Stage | Scope | Status |
 |---|---|---|
 | A | Room v2, `MIGRATION_1_2`, DAOs, schema export, migration/DAO tests | **Complete** |
-| B | Shared `NtfyAuth`, `PublishValidator`, JSON publish client, MockWebServer contracts | Not started |
+| B | Shared `NtfyAuth`, `PublishValidator`, JSON publish client, MockWebServer contracts | **Complete** |
 | C | `OutboxRepository`, `ActivityRepository`, `CommandRepository`, receive-event transaction | Not started |
 | D | Publish/Activity/Command ViewModels, five destinations, Saved filter, profile switch/preview | Not started |
 | E | `rplab.command.v1` envelope, policy, `MockCommandExecutor`, CommandPanel | Not started |
@@ -41,6 +42,31 @@ Detailed schema, DAO behavior, file list and risks: `PHASE_4_STAGE_A_REPORT.md`.
 
 ---
 
+## Stage B outcome
+
+- `NtfyAuth` is the single auth implementation for receive and publish: guest
+  sends no header, Basic uses `Credentials.basic`, Bearer sends the token; CR/LF
+  are stripped; credentials only ever travel in the `Authorization` header.
+- `PublishValidator` rejects invalid topic/message/priority/tags/click/attach/
+  delay/server-URL/credentials before any network call.
+- `NtfyEndpoint.publishUrl` builds `POST {base}/{topic}` from validated input.
+- `NtfyPublishClient` sends plain text when only a message is present and the
+  documented JSON body otherwise; parses the server message id; uses bounded
+  connect/read/write/call timeouts; never retries and never auto-resends.
+- Typed outcomes distinguish validation, authentication (401), permission (403),
+  server (429/5xx), definite network failure and ambiguous results. `Accepted`
+  means the server accepted the publish, not that anyone received it.
+- `NftyRepository.publish(profileId, request)` resolves config through
+  `ProfileRepository.loadConfig(profileId)`, so the profile's server URL and
+  SecretStore credential are used with no cross-profile fallback.
+- No database or entity change: credentials remain in the Keystore-backed
+  `SecretStore`.
+- No Stage C outbox/activity/command code, no Compose UI, no binary uploads.
+
+Full detail: `PHASE_4_STAGE_B_REPORT.md`.
+
+---
+
 ## Verification (2026-11-09)
 
 ```text
@@ -48,10 +74,12 @@ Detailed schema, DAO behavior, file list and risks: `PHASE_4_STAGE_A_REPORT.md`.
 # exit 0 — 36 tests, 0 failures, 0 errors, 0 skipped
 
 ./gradlew testDebugUnitTest
-# exit 0 — 194 tests, 0 failures, 0 errors, 2 pre-existing skips
+# exit 0 — 240 tests, 0 failures, 0 errors, 2 pre-existing skips
+#   (Stage B adds 39 tests: NtfyAuth 6, PublishValidator 11,
+#    NtfyPublishClient 17, NftyRepositoryPublish 5)
 
 ./gradlew assembleDebug
-# exit 0 — app-debug.apk, 19,648,407 bytes
+# exit 0 — app-debug.apk, 19,720,707 bytes
 
 ./gradlew lintDebug
 # exit 0 — 0 errors, 56 warnings
@@ -73,17 +101,18 @@ substitute for device validation; see R-23.
 | R-26 | Pruning removes old terminal history by design. | Accepted, documented |
 
 Stage B adds network code; it must not attempt a real-server publish until the
-origin is healthy. MockWebServer is the Stage B evidence.
+origin is healthy. MockWebServer is the Stage B evidence. R-17 (real origin HTTP
+502) and the device matrix remain open.
 
 ---
 
 ## Approval required
 
-**Stage A is complete. Stage B has not started.**
+**Stage B is complete. Stage C has not started.**
 
-Before Stage B:
+Before Stage C:
 
-> Approve `PHASE_4_STAGE_A_REPORT.md` and authorise Stage B (shared ntfy auth,
-> publish validation, JSON publish client and MockWebServer contract tests).
+> Review `PHASE_4_STAGE_B_REPORT.md` and authorise Stage C (outbox and activity
+> repositories, receive-event transaction, command repository).
 
-No Stage B code will be written until that approval is recorded.
+No Stage C code will be written until that approval is recorded.

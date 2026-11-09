@@ -76,6 +76,44 @@ remains outstanding.
 ./gradlew lintDebug                                                             # exit 0 — 0 errors, 56 warnings
 ```
 
+
+## Phase 4 — Stage B (2026-11-10)
+
+**Status: Complete.** Publish-client foundation only; Stage C not started.
+
+- Added `data/api/NtfyAuth.kt` (guest/Basic/Bearer, CR/LF sanitisation). The
+  stream client now shares it, so receive and publish authenticate identically.
+- Added `data/api/PublishValidator.kt`: topic charset, non-blank message,
+  priority 1–5, tags, absolute http(s) click/attach URLs, delay duration or Unix
+  timestamp, server URL and credential presence — all before any network call.
+- Added `NtfyEndpoint.publishUrl(base, topic, requireHttps)`.
+- Added `NtfyPublishClient` (`POST {base}/{topic}`; plain text for message-only,
+  JSON for metadata; parses the server id) with bounded connect/read/write/call
+  timeouts, no retries and no automatic resend.
+- Typed `PublishResult`: `Accepted` (server accepted; **not** delivered),
+  `ValidationFailed`, `AuthenticationFailed` (401), `PermissionFailed` (403),
+  `ServerError` (429/5xx), `NetworkError` (definite transport failure) and
+  `Ambiguous` (must not be auto-resent).
+- `NftyRepository.publish(profileId, request)` resolves the config through
+  `ProfileRepository.loadConfig(profileId)`; blank/unknown profile is rejected
+  with no fallback, so credentials cannot cross profiles.
+- No database, entity, migration, delivery-mode, UI or navigation change.
+  Credentials stay in the Keystore-backed `SecretStore`.
+
+**Tests added:** 39 — `NtfyAuthTest` 6, `PublishValidatorTest` 11,
+`NtfyPublishClientTest` 17 (MockWebServer), `NftyRepositoryPublishTest` 5.
+
+**Verified (final code):**
+
+```text
+./gradlew testDebugUnitTest  # exit 0 — 240 tests, 0 failures, 2 pre-existing skips
+./gradlew assembleDebug      # exit 0 — app-debug.apk 19,720,707 bytes
+./gradlew lintDebug          # exit 0 — 0 errors, 56 warnings
+```
+
+Real-server publish remains unverified (origin previously HTTP 502); evidence is
+MockWebServer only. No device available. See `PHASE_4_STAGE_B_REPORT.md`.
+
 ## Documentation authority
 
 - `PLAN.md` in the repository root is authoritative; the plan-folder copy is a
@@ -92,12 +130,14 @@ remains outstanding.
 - The handoff is `2fe0ce6`; the takeover report and documentation reconciliation
   are committed in `93c34d1`; the hygiene fix is `bc6b6cd`; decision cleanup is
   `4140ca0`.
-- Stage A is checkpointed in `db6e77a`; the documentation hash update is a follow-up commit.
+- Stage A is checkpointed in `db6e77a`; Stage A.1 in `49e3159`; Stage B code and
+  docs are checkpointed after this update (see `PHASE_4_STAGE_B_REPORT.md`).
 - Never reset/clean the repository; do not rewrite history.
 
 ## Next
 
-1. Owner review of `PHASE_4_STAGE_A_REPORT.md`.
-2. Owner approval to start Stage B (shared ntfy auth/publish client).
+1. Owner review of `PHASE_4_STAGE_B_REPORT.md` and the Stage B diff.
+2. Owner approval before Stage C (outbox/activity/command repositories and the
+   receive-event transaction).
 3. Device test matrix in `PHASE_3_REPORT.md` §6 remains owner/hardware-gated.
-4. No Stage B code until explicit approval.
+4. Real publish smoke test once the ntfy origin is healthy (R-17).

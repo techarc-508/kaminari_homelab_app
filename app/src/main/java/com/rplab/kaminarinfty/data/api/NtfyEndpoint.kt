@@ -117,4 +117,23 @@ object NtfyEndpoint {
 
     fun rootUrl(rawBaseUrl: String, requireHttps: Boolean): Result<String> =
         normalizeBaseUrl(rawBaseUrl, requireHttps)
+
+    /**
+     * `POST {base}/{topic}` — the documented ntfy publish endpoint. The topic is
+     * validated and added as a single path segment so no user input can escape
+     * the base path or inject a query/fragment.
+     */
+    fun publishUrl(rawBaseUrl: String, topic: String, requireHttps: Boolean): Result<String> {
+        val base = normalizeBaseUrl(rawBaseUrl, requireHttps).getOrElse { return Result.failure(it) }
+        if (!isValidTopic(topic)) {
+            return Result.failure(
+                IllegalArgumentException(
+                    "Invalid topic name \"$topic\": use 1-64 letters, digits, '-' or '_'"
+                )
+            )
+        }
+        val baseUrl = base.toHttpUrlOrNull()
+            ?: return Result.failure(IllegalArgumentException("Server URL is invalid"))
+        return Result.success(baseUrl.newBuilder().addPathSegment(topic).build().toString())
+    }
 }

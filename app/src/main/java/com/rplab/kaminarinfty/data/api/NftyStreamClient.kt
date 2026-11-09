@@ -15,7 +15,6 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
-import okhttp3.Credentials
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.Response
@@ -392,31 +391,8 @@ class NftyStreamClient(
         )
     }
 
-    private fun applyAuthHeaders(builder: Request.Builder, config: ServerConfig) {
-        when (config.authMethod) {
-            AuthMethod.GUEST -> Unit
-            AuthMethod.USERNAME_PASSWORD -> {
-                if (config.username.isNotBlank() && config.tokenOrPassword.isNotBlank()) {
-                    builder.header(
-                        "Authorization",
-                        Credentials.basic(config.username, sanitizeHeaderValue(config.tokenOrPassword)),
-                    )
-                }
-            }
-            AuthMethod.ACCESS_TOKEN -> {
-                if (config.tokenOrPassword.isNotBlank()) {
-                    builder.header(
-                        "Authorization",
-                        "Bearer ${sanitizeHeaderValue(config.tokenOrPassword)}",
-                    )
-                }
-            }
-        }
-    }
-
-    /** Prevents header injection through a pasted token containing CR/LF. */
-    private fun sanitizeHeaderValue(raw: String): String =
-        raw.trim().replace("\r", "").replace("\n", "")
+    private fun applyAuthHeaders(builder: Request.Builder, config: ServerConfig) =
+        NtfyAuth.apply(builder, config)
 
     private fun mapException(e: Exception): Pair<NftyErrorCategory, Exception> = when (e) {
         is UnknownHostException -> Pair(

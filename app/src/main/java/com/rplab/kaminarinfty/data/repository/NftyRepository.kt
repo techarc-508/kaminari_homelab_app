@@ -1,6 +1,10 @@
 package com.rplab.kaminarinfty.data.repository
 
 import com.rplab.kaminarinfty.data.api.NtfyApi
+import com.rplab.kaminarinfty.data.api.NtfyPublish
+import com.rplab.kaminarinfty.data.api.NtfyPublishClient
+import com.rplab.kaminarinfty.data.api.PublishRequest
+import com.rplab.kaminarinfty.data.api.PublishResult
 import com.rplab.kaminarinfty.data.api.NtfyEndpoint
 import com.rplab.kaminarinfty.data.api.NftyStreamClient
 import com.rplab.kaminarinfty.data.api.NftyStreamEvent
@@ -66,6 +70,8 @@ class NftyRepository(
     private val client: NtfyApi = NftyStreamClient(),
     private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO),
     private val random: Random = Random.Default,
+    private val profileRepository: ProfileRepository? = null,
+    private val publisher: NtfyPublish = NtfyPublishClient(),
 ) : StreamRepository {
 
     private var streamJob: Job? = null
@@ -311,6 +317,25 @@ class NftyRepository(
             }
             true
         }
+    }
+
+    /**
+     * Publishes a message through the selected profile only.
+     *
+     * The [ServerConfig] is always resolved from [profileId] through
+     * [ProfileRepository], so the profile's server URL and its SecretStore-backed
+     * credentials are used. There is deliberately no fallback to another profile:
+     * credentials can never cross profiles.
+     */
+    suspend fun publish(profileId: String, request: PublishRequest): PublishResult {
+        if (profileId.isBlank()) {
+            return PublishResult.ValidationFailed("Select a server profile before publishing")
+        }
+        val profiles = profileRepository
+            ?: return PublishResult.ValidationFailed("Profile storage is not available")
+        val config = profiles.loadConfig(profileId)
+            ?: return PublishResult.ValidationFailed("Unknown server profile: $profileId")
+        return publisher.publish(config, request)
     }
 
     private companion object {

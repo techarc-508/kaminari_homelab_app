@@ -1,13 +1,13 @@
 # Phase 4 Report — Compose, Activity and Command Centre
 
-**Status:** Stage B complete. Stages C–F not started.
+**Status:** Stage C complete. Stages D–F not started.
 **Last updated:** 2026-11-10
-**Owner authorization:** Stage A approved 2026-11-09; Stage B authorised 2026-11-10.
-**Stage A checkpoint:** `db6e77a`. **Stage A.1:** `49e3159`.
+**Owner authorization:** Stage A approved 2026-11-09; Stage B authorised 2026-11-10; Stage C authorised 2026-11-10.
+**Stage A checkpoint:** `db6e77a`. **Stage A.1:** `49e3159`. **Stage B:** `675ec14`.
 
 This is the living Phase 4 report. Stage A has its own detailed report:
-`PHASE_4_STAGE_A_REPORT.md`; Stage B has `PHASE_4_STAGE_B_REPORT.md`. Later
-stages append here.
+`PHASE_4_STAGE_A_REPORT.md`; Stage B has `PHASE_4_STAGE_B_REPORT.md`; Stage C has
+`PHASE_4_STAGE_C_REPORT.md`. Later stages append here.
 
 ---
 
@@ -17,9 +17,9 @@ stages append here.
 |---|---|---|
 | A | Room v2, `MIGRATION_1_2`, DAOs, schema export, migration/DAO tests | **Complete** |
 | B | Shared `NtfyAuth`, `PublishValidator`, JSON publish client, MockWebServer contracts | **Complete** |
-| C | `OutboxRepository`, `ActivityRepository`, `CommandRepository`, receive-event transaction | Not started |
+| C | `OutboxRepository`, `ActivityRepository`, receive-event transaction, manual retry, recovery, retention | **Complete** |
 | D | Publish/Activity/Command ViewModels, five destinations, Saved filter, profile switch/preview | Not started |
-| E | `rplab.command.v1` envelope, policy, `MockCommandExecutor`, CommandPanel | Not started |
+| E | `rplab.command.v1` envelope, policy, command repository, `MockCommandExecutor`, CommandPanel | Not started |
 | F | Full gate, independent QA, final Phase 4 report | Not started |
 
 ---
@@ -67,16 +67,47 @@ Full detail: `PHASE_4_STAGE_B_REPORT.md`.
 
 ---
 
-## Verification (2026-11-09)
+## Stage C outcome
+
+- `OutboxRepository` wraps the existing conditional DAO transitions with
+  validated enqueue, atomic claim, typed Stage B result mapping, manual retry,
+  stale-`SENDING` recovery and retention. No automatic retry or resend exists.
+- `Accepted` maps to `ACCEPTED`; definitive rejections to
+  `FAILED(retryable=false)`; auth, permission, 429/5xx and definite connect
+  failures to `FAILED(retryable=true)`; timeouts, ambiguous and unexpected
+  outcomes to `AMBIGUOUS`.
+- `ACCEPTED` means the server accepted the publish, not that a recipient
+  received it.
+- Retrying `AMBIGUOUS` requires an explicit confirmation and reuses the original
+  row, preserving its attempt history. Non-retryable failures are refused.
+- `SENDING` rows older than two minutes become `AMBIGUOUS`, never `QUEUED`.
+- `ActivityRepository` records queued, started, accepted, failed, ambiguous and
+  retry events with deterministic IDs and sanitized summaries; message bodies,
+  titles and credentials never enter the timeline.
+- `MessageRepository.store` writes the message and one `MESSAGE_RECEIVED` event
+  in one transaction; a duplicate message writes no event.
+- Retention is applied through `RetentionPolicy`: activity 90 days / 5,000 per
+  profile; outbox 30 days / 500 terminal rows per profile. Active work is never
+  pruned.
+- Every operation is profile-scoped; no config or credential fallback exists.
+- No database/entity/migration change, no UI, no background sender, no command
+  execution and no binary uploads.
+
+Full detail: `PHASE_4_STAGE_C_REPORT.md`.
+
+
+---
+
+## Verification (2026-11-10)
 
 ```text
 ./gradlew :app:testDebugUnitTest --tests 'com.rplab.kaminarinfty.data.local.*'
 # exit 0 — 36 tests, 0 failures, 0 errors, 0 skipped
 
-./gradlew testDebugUnitTest
-# exit 0 — 240 tests, 0 failures, 0 errors, 2 pre-existing skips
-#   (Stage B adds 39 tests: NtfyAuth 6, PublishValidator 11,
-#    NtfyPublishClient 17, NftyRepositoryPublish 5)
+./gradlew testDebugUnitTest --rerun-tasks
+# exit 0 — 284 tests, 0 failures, 0 errors, 2 pre-existing skips
+#   (Stage C adds 44: OutboxRepository 27, ActivityRepository 9,
+#    MessageRepositoryActivity 4, OutboxIntegration 4; Stage B added 39)
 
 ./gradlew assembleDebug
 # exit 0 — app-debug.apk, 19,720,707 bytes
@@ -100,19 +131,21 @@ substitute for device validation; see R-23.
 | R-25 | `LIKE` search is not FTS. | Accepted, measure on device |
 | R-26 | Pruning removes old terminal history by design. | Accepted, documented |
 
-Stage B adds network code; it must not attempt a real-server publish until the
-origin is healthy. MockWebServer is the Stage B evidence. R-17 (real origin HTTP
-502) and the device matrix remain open.
+Stage C adds orchestration only; it does not send automatically and does not
+call a real server. R-17 (real origin HTTP 502), the device matrix and the
+absence of a real ntfy publish/receive smoke test remain open. MockWebServer
+remains the network-layer evidence from Stage B.
 
 ---
 
 ## Approval required
 
-**Stage B is complete. Stage C has not started.**
+**Stage C is complete. Stage D has not started.**
 
-Before Stage C:
+Before Stage D:
 
-> Review `PHASE_4_STAGE_B_REPORT.md` and authorise Stage C (outbox and activity
-> repositories, receive-event transaction, command repository).
+> Review `PHASE_4_STAGE_C_REPORT.md` and authorise Stage D (publish, activity and
+> command ViewModels; five-destination navigation; Saved filter; profile
+> switching and URL-change preview).
 
-No Stage C code will be written until that approval is recorded.
+No Stage D code will be written until that approval is recorded.

@@ -2,14 +2,16 @@ package com.rplab.kaminarinfty.data.local
 
 import androidx.room.Dao
 import androidx.room.Insert
+import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Transaction
 import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface ActivityDao {
-    @Insert
-    suspend fun insert(event: ActivityEventEntity)
+    /** Deterministic event IDs make retries idempotent: an existing row is ignored. */
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insert(event: ActivityEventEntity): Long
 
     @Query(
         "SELECT * FROM activity_events WHERE profileId = :profileId " +

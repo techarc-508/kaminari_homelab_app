@@ -4,6 +4,7 @@ package com.rplab.kaminarinfty.model
 enum class ActivityType {
     MESSAGE_RECEIVED,
     PUBLISH_QUEUED,
+    PUBLISH_STARTED,
     PUBLISH_ACCEPTED,
     PUBLISH_FAILED,
     PUBLISH_AMBIGUOUS,
@@ -21,3 +22,16 @@ enum class ActivitySeverity {
     WARNING,
     ERROR,
 }
+
+/** Bounded, sanitized timeline entry. Never contains a message body or secret. */
+data class ActivityEvent(
+    val id: String,
+    val profileId: String,
+    val type: ActivityType,
+    val severity: ActivitySeverity,
+    val summary: String,
+    val correlationId: String? = null,
+    val messageId: String? = null,
+    val topic: String? = null,
+    val createdAt: Long,
+)

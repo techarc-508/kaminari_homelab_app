@@ -69,6 +69,13 @@ interface OutboxDao {
         reason: String,
     ): Int
 
+    /** Rows a process restart may orphan; recorded before [recoverStuckSending] moves them. */
+    @Query(
+        "SELECT * FROM outbox_entries WHERE profileId = :profileId AND state = 'SENDING' " +
+            "AND updatedAt < :cutoff ORDER BY createdAt ASC"
+    )
+    suspend fun getStuckSending(profileId: String, cutoff: Long): List<OutboxEntryEntity>
+
     @Query(
         "DELETE FROM outbox_entries WHERE profileId = :profileId AND clientId = :clientId " +
             "AND state IN ('QUEUED', 'FAILED', 'AMBIGUOUS')"

@@ -1,7 +1,7 @@
 # TODO — Kaminari Nfty V1
 
 **Updated:** 2026-11-10, after Stage B completed and was checkpointed.
-Phase 4 is authorised through **Stage B**; Stages C–F require owner approval at the Stage B gate.
+Phase 4 is authorised through **Stage C**; Stages D–F require owner approval at the Stage C gate.
 
 ## Phase 3 closure (owner/device required)
 
@@ -24,19 +24,21 @@ Phase 3 is accepted as **PASS WITH CONDITIONS**. These conditions are still open
 - [ ] Owner sign-off on the two-mode UI and legacy `SAVED` → `BATTERY_SAVER` migration.
 - [ ] Verify the Android Keystore round-trip on hardware (the two skipped tests).
 
-## Phase 4 — Stage B complete; Stages C–F await approval
+## Phase 4 — Stage C complete; Stages D–F await approval
 
 - [x] Stage 0: freeze Room v1 schema; export `1.json`; KSP schema output enabled.
 - [x] Stage A: Room v2 entities, DAOs, `MIGRATION_1_2`, migration test, DAO state-transition tests, schema `2.json`.
 - [x] Stage A.1: profile-scoped DAO operations, fail-closed outbox parsing, retention policy, migration assertions — checkpoint `49e3159`.
 - [x] Owner review of `PHASE_4_STAGE_A_REPORT.md` and approval to start Stage B.
 - [x] Stage B: shared `NtfyAuth`, `PublishValidator`, JSON publish client + MockWebServer tests — see `PHASE_4_STAGE_B_REPORT.md`.
-- [ ] Owner review of `PHASE_4_STAGE_B_REPORT.md` and approval to start Stage C.
-- [ ] Stage C: `ActivityRepository`, receive-event transaction, `OutboxRepository` state machine, `CommandRepository`.
+- [x] Owner review of `PHASE_4_STAGE_B_REPORT.md` and approval to start Stage C.
+- [x] Stage C: `OutboxRepository` state machine, `ActivityRepository`, receive-event transaction, manual retry, interrupted-send recovery, retention — see `PHASE_4_STAGE_C_REPORT.md`.
+- [ ] Owner review of `PHASE_4_STAGE_C_REPORT.md` and approval to start Stage D.
 - [ ] Stage D: `PublishViewModel`/`ActivityViewModel`/`CommandViewModel`, five-destination navigation, Saved filter, profile switch/preview.
 - [ ] Stage E: `rplab.command.v1` envelope, policy, repository, `MockCommandExecutor`, CommandPanel.
 - [ ] Stage F: full gate, independent QA, final `PHASE_4_REPORT.md`.
-- [x] Owner authorization of Phase 4 scope (2026-11-09); Stage A only was authorised in this task.
+- [x] Owner authorization of Phase 4 scope (2026-11-09); Stage A only was authorised in that task.
+- [x] Owner acceptance of Stage B and explicit authorization of Stage C (2026-11-10).
 
 ## Deferred (owner decision D-05)
 

@@ -16,7 +16,19 @@ Append-only record of owner decisions and the technical choices that follow from
 | D-08 | Phase 4 is **not authorised** until explicit owner approval. | Owner checkpoint instruction |
 | D-09 | Phase 3 is **ACCEPTED — PASS WITH CONDITIONS** (2026-11-09). The original FAIL and remediation history are preserved. No hardware validation may be claimed. | Owner instruction, 2026-11-09; `PHASE_3_ACCEPTANCE.md` |
 | D-10 | The repository-root `PLAN.md` is authoritative; the plan-folder copy is a mirror. Phase 1/2 reports are mirrored into the repository for a self-contained record. | Owner instruction, 2026-11-09 |
-| D-11 | Phase 4 default scope: publish with URL/metadata attachments (binary upload deferred), durable outbox, activity timeline, typed command envelope with **mock** executor, Room-backed inbox/topic UX, multiple profiles with safe switching and a migration/URL-change preview. Proposed, not authorised. | Owner instruction, 2026-11-09 |
+| D-11 | Phase 4 default scope: publish with URL/metadata attachments (binary upload deferred), durable outbox, activity timeline, typed command envelope with **mock** executor, Room-backed inbox/topic UX, multiple profiles with safe switching and a migration/URL-change preview. Approved as the Phase 4 defaults; Stage A authorized by D-12. | Owner instruction, 2026-11-09 |
+| D-12 | **Phase 4 authorised (2026-11-09) for Stage A only.** Owner locked the approved scope: five destinations, URL/metadata attachments only, durable outbox with manual retry, Room activity timeline, typed `rplab.command.v1` envelope with **mock executor only**, profile isolation and URL-change preview. Stages B–F require owner approval at the Stage A gate. | Owner authorization, 2026-11-09 |
+
+## Technical decisions (Phase 4 Stage A, 2026-11-09)
+
+| ID | Decision | Rationale |
+|---|---|---|
+| T4A-01 | Room v2 adds only `outbox_entries`, `activity_events` and `command_requests`; existing tables and columns are untouched. | Additive migration preserves all existing messages, saved state, subscriptions and profiles. |
+| T4A-02 | `MIGRATION_1_2` is explicit and `fallbackToDestructiveMigration` is absent. | AGENTS.md forbids destructive migration in release builds; user history must survive upgrades. |
+| T4A-03 | Outbox transitions are conditional SQL updates (`WHERE state = :expected`), not read-modify-write. | Prevents double sends/claims from concurrent senders and makes retry idempotent at the database boundary. |
+| T4A-04 | Retention: activity 90 days / 5,000 rows per profile; outbox 30 days / 500 terminal rows per profile. Queued work is never pruned. | Bounded storage for low-RAM devices; audit trail survives normal use. |
+| T4A-05 | Migration test constructs the v1 database from the exported `1.json` schema, not hand-written v1 DDL. | Proves the actual shipped schema can migrate, not a convenient approximation. |
+| T4A-06 | Repository classes are deferred to Stage C; Stage A tests the DAOs and state machine directly. | Keeps Stage A focused on persistence and avoids duplicate repository scaffolding before publish/activity behavior exists. |
 
 ## Technical decisions (Phase 3 remediation, 2026-11-09)
 
@@ -36,11 +48,11 @@ Append-only record of owner decisions and the technical choices that follow from
 1. Notification actions remain deferred by D-05; revisit only if the owner reopens it.
 2. Whether to pursue an FCM/UnifiedPush fallback (optional in PLAN).
 3. E-Ink profile specifics once the Boox model/firmware is known.
-4. Phase 4: approve JSON-root publish, `view`-only actions, manual-only outbox
-   retry, mock-only command centre and the profile URL-change preview
+4. Phase 4: Stage B–F approval after the Stage A report; JSON-root publish,
+   `view`-only actions, manual-only outbox retry, mock-only command centre and
+   the profile URL-change preview remain as approved defaults
    (`PHASE_4_ARCHITECTURE.md` §16).
-5. Phase 4: confirm whether Saved remains an Inbox filter (recommended) or a
-   bottom destination.
+5. Resolved: Saved remains an Inbox filter (`D-11`).
 6. Phase 6: real allowlisted PVE actions and gateway trust boundary.
 
 ## Documentation reconciliation (2026-11-09)

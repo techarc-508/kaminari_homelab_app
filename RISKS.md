@@ -1,6 +1,6 @@
 # Risk Register — Kaminari Nfty V1
 
-**Last updated:** 2026-11-09 (Phase 3 accepted; Phase 4 planned)
+**Last updated:** 2026-11-09 (Phase 3 accepted; Phase 4 Stage A complete)
 Severity reflects user impact; state reflects what is verified.
 
 | ID | Risk | Severity | State / mitigation |
@@ -27,3 +27,7 @@ Severity reflects user impact; state reflects what is verified.
 | R-20 | **Command replay/expiry bypass if a future executor trusts the app blindly.** | High (Phase 6) | Envelope requires single-use nonce, ±60 s issue window, 5 min expiry, allowlist, explicit confirmation. The gateway must re-validate independently. |
 | R-21 | **Activity/outbox growth on a low-RAM device.** | Medium | Bounded queries and retention: activity 90 days/5,000 rows per profile; outbox 30 days/500 terminal entries; never prune queued work. Measure on hardware. |
 | R-22 | **No automatic publish retry:** a failed publish waits for the user. | Low | Accepted Phase 4 default; automatic retry needs an idempotency design and is deferred. |
+| R-23 | **Stage A migration is verified on Robolectric only**, not on a physical device with a real v1 database. | Medium | `Migration1To2Test` builds the v1 schema from `1.json` and opens v2 through Room; still add an instrumented/device migration test when hardware exists. |
+| R-24 | **Schema v2 is committed before the repositories and UI exist.** A later entity change would need a v3 migration even if no user ever received v2. | Low | Accepted: v2 is additive and stable; fix forward with explicit migrations, never edit v2 or use destructive fallback. |
+| R-25 | **Substring search uses SQL `LIKE`, not FTS.** Large histories may scan. | Medium | Bounded by `LIMIT`/`OFFSET`; measure on a low-end device; FTS is a future optimization, not a Stage A requirement. |
+| R-26 | **Outbox/activity/command pruning could remove old terminal history** by design. | Low | Retention is 90 days/5,000 activity rows and 30 days/500 terminal outbox rows; queued work is never pruned. Documented in Settings in Stage D. |

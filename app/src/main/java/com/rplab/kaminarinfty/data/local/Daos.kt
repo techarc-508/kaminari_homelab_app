@@ -41,6 +41,9 @@ interface TopicSubscriptionDao {
 
     @Query("DELETE FROM topic_subscriptions WHERE profileId = :profileId AND topic = :topic")
     suspend fun delete(profileId: String, topic: String)
+
+    @Query("SELECT COUNT(*) FROM topic_subscriptions WHERE profileId = :profileId")
+    suspend fun count(profileId: String): Int
 }
 
 @Dao
@@ -83,6 +86,32 @@ interface MessageDao {
     @Query("SELECT COUNT(*) FROM messages WHERE profileId = :profileId")
     suspend fun countForProfile(profileId: String): Int
 
+    /** Bounded substring search; no FTS in Phase 4. */
+    @Query(
+        "SELECT * FROM messages WHERE profileId = :profileId AND (" +
+            "title LIKE '%' || :query || '%' OR body LIKE '%' || :query || '%' " +
+            "OR topic LIKE '%' || :query || '%') " +
+            "ORDER BY time DESC, localId DESC LIMIT :limit OFFSET :offset"
+    )
+    suspend fun search(
+        profileId: String,
+        query: String,
+        limit: Int,
+        offset: Int,
+    ): List<MessageEntity>
+
+    @Query(
+        "SELECT * FROM messages WHERE profileId = :profileId AND isSaved = 1 " +
+            "ORDER BY time DESC, localId DESC LIMIT :limit"
+    )
+    fun observeSaved(profileId: String, limit: Int): Flow<List<MessageEntity>>
+
+    @Query(
+        "SELECT topic, COUNT(*) AS count FROM messages " +
+            "WHERE profileId = :profileId AND isRead = 0 GROUP BY topic"
+    )
+    fun observeUnreadCounts(profileId: String): Flow<List<UnreadCount>>
+
     @Query("UPDATE messages SET isRead = 1 WHERE profileId = :profileId AND messageId = :messageId")
     suspend fun markRead(profileId: String, messageId: String)
 
@@ -105,3 +134,9 @@ interface MessageDao {
     @Query("DELETE FROM messages WHERE profileId = :profileId AND isSaved = 0")
     suspend fun clearHistoryKeepingSaved(profileId: String)
 }
+
+/** Projection for per-topic unread badges. */
+data class UnreadCount(
+    val topic: String,
+    val count: Int,
+)

@@ -1,6 +1,6 @@
 # Kaminari Nfty — V1 Product, Architecture & Delivery Plan
 
-**Status:** Living plan — Phase 3 accepted (PASS WITH CONDITIONS); Phase 4 planned, awaiting owner approval  
+**Status:** Living plan — Phase 3 accepted (PASS WITH CONDITIONS); Phase 4 Stage A complete (Room v2), Stages B–F pending owner approval
 **Target:** First dependable daily-use Android model, not a feature-complete ntfy clone  
 **Platform:** Native Android / Kotlin / Jetpack Compose  
 **Default server URL found in source:** `https://nfty.rplab.qzz.io` (DNS/TLS verified; origin returned HTTP 502 on 2026-11-08 — re-check before live use)
@@ -382,7 +382,7 @@ Status (2026-11-09, remediated): implemented and independently re-audited — se
 
 ### Phase 4 — Compose, activity and command centre
 
-**Status: planned — not authorised. Do not implement until the owner explicitly approves `PHASE_4_ARCHITECTURE.md` and `PHASE_4_IMPLEMENTATION_PLAN.md`.**
+**Status: Stage A complete (2026-11-09) — Stages B–F not started. Owner approval of `PHASE_4_STAGE_A_REPORT.md` is required before Stage B.**
 
 Deliver:
 - Inbox/topic UX wired to Room, including unread counts, search and the Saved filter.
@@ -393,6 +393,8 @@ Deliver:
 - Multiple server profiles with clear active identity, safe switching and a URL-change preview.
 
 Gate: full publish round trip demonstrated against MockWebServer with a correlation ID and honest state labels; a real-server round trip is blocked by the current HTTP 502 and must be recorded as a condition, never claimed; migration test passes or is recorded as device-blocked; independent QA audit.
+
+**Stage A evidence (2026-11-09):** Room v2 adds `outbox_entries`, `activity_events` and `command_requests` with an explicit additive `MIGRATION_1_2`; exported schemas `1.json`/`2.json`; `Migration1To2Test` builds a real v1 database from `1.json` and verifies preservation plus cascade. Full suite 194 tests / 0 failures / 2 pre-existing skips; `assembleDebug` SUCCESS (19,648,407 B); `lint` 0 errors / 56 warnings. No Stage B publish client, UI, activity screen or command execution was started.
 
 **Phase scope correction:** E-Ink belongs to Phase 5 (low-end/E-Ink). ntfy administration and the PVE command gateway belong to Phase 6. Phase 4 does not implement binary attachment upload, automatic background publish retries, real PVE execution, ntfy administration, E-Ink tuning or release signing. This section supersedes the earlier handoff wording.
 
@@ -525,7 +527,7 @@ Targets are engineering goals, not promises until measured on real hardware.
 | Phase 1 — architecture and data foundation | Complete, approved | `PHASE_1_REPORT.md`; Room/DataStore/Keystore, demo isolation |
 | Phase 2 — ntfy API correctness | Complete, locally verified; real-server smoke test pending | `PHASE_2_REPORT.md`, `PHASE_2_GATE_REPORT.md`; commit `5d00827` |
 | Phase 3 — notification and background delivery | **ACCEPTED — PASS WITH CONDITIONS** (2026-11-09) | `PHASE_3_REPORT.md`, `PHASE_3_AUDIT_REPORT.md`, `PHASE_3_REMEDIATION_REPORT.md`, `PHASE_3_FINAL_AUDIT.md`, `PHASE_3_ACCEPTANCE.md` |
-| Phase 4 — Compose, activity and command centre | **Planned; awaiting owner approval** | `PHASE_4_ARCHITECTURE.md`, `PHASE_4_IMPLEMENTATION_PLAN.md` |
+| Phase 4 — Compose, activity and command centre | **Stage A complete; Stages B–F pending approval** | `PHASE_4_ARCHITECTURE.md`, `PHASE_4_IMPLEMENTATION_PLAN.md`, `PHASE_4_STAGE_A_REPORT.md` |
 | Phase 5 — low-end/E-Ink | Not started | Owner decision `D-04`: generic E-Ink until the Boox arrives |
 | Phase 6 — administration/security | Not started | ntfy admin + separate trusted PVE gateway |
 | Phase 7 — release/QA | Not started | Signed `dist/` APK is the final gate |

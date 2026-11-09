@@ -1,0 +1,301 @@
+{
+  "formatVersion": 1,
+  "database": {
+    "version": 1,
+    "identityHash": "be503b797ffc67398f00222c5117c521",
+    "entities": [
+      {
+        "tableName": "server_profiles",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `displayName` TEXT NOT NULL, `baseUrl` TEXT NOT NULL, `authMethod` TEXT NOT NULL, `createdAt` INTEGER NOT NULL, `updatedAt` INTEGER NOT NULL, PRIMARY KEY(`id`))",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "displayName",
+            "columnName": "displayName",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "baseUrl",
+            "columnName": "baseUrl",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "authMethod",
+            "columnName": "authMethod",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "createdAt",
+            "columnName": "createdAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "updatedAt",
+            "columnName": "updatedAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        }
+      },
+      {
+        "tableName": "topic_subscriptions",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `profileId` TEXT NOT NULL, `topic` TEXT NOT NULL, `isSubscribed` INTEGER NOT NULL, `isPaused` INTEGER NOT NULL, `priorityThreshold` INTEGER, `createdAt` INTEGER NOT NULL, FOREIGN KEY(`profileId`) REFERENCES `server_profiles`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "profileId",
+            "columnName": "profileId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "topic",
+            "columnName": "topic",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "isSubscribed",
+            "columnName": "isSubscribed",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "isPaused",
+            "columnName": "isPaused",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "priorityThreshold",
+            "columnName": "priorityThreshold",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "createdAt",
+            "columnName": "createdAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_topic_subscriptions_profileId_topic",
+            "unique": true,
+            "columnNames": [
+              "profileId",
+              "topic"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_topic_subscriptions_profileId_topic` ON `${TABLE_NAME}` (`profileId`, `topic`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "server_profiles",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "profileId"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "messages",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`localId` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `profileId` TEXT NOT NULL, `messageId` TEXT NOT NULL, `time` INTEGER NOT NULL, `topic` TEXT NOT NULL, `title` TEXT, `body` TEXT NOT NULL, `priority` INTEGER NOT NULL, `tagsJson` TEXT NOT NULL, `clickUrl` TEXT, `attachmentJson` TEXT, `actionsJson` TEXT, `expiry` INTEGER, `isRead` INTEGER NOT NULL, `isSaved` INTEGER NOT NULL, `isSample` INTEGER NOT NULL, `receivedAt` INTEGER NOT NULL, FOREIGN KEY(`profileId`) REFERENCES `server_profiles`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "localId",
+            "columnName": "localId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "profileId",
+            "columnName": "profileId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "messageId",
+            "columnName": "messageId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "time",
+            "columnName": "time",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "topic",
+            "columnName": "topic",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "title",
+            "columnName": "title",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "body",
+            "columnName": "body",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "priority",
+            "columnName": "priority",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "tagsJson",
+            "columnName": "tagsJson",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "clickUrl",
+            "columnName": "clickUrl",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "attachmentJson",
+            "columnName": "attachmentJson",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "actionsJson",
+            "columnName": "actionsJson",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "expiry",
+            "columnName": "expiry",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "isRead",
+            "columnName": "isRead",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "isSaved",
+            "columnName": "isSaved",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "isSample",
+            "columnName": "isSample",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "receivedAt",
+            "columnName": "receivedAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "localId"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_messages_profileId_messageId",
+            "unique": true,
+            "columnNames": [
+              "profileId",
+              "messageId"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_messages_profileId_messageId` ON `${TABLE_NAME}` (`profileId`, `messageId`)"
+          },
+          {
+            "name": "index_messages_profileId_time",
+            "unique": false,
+            "columnNames": [
+              "profileId",
+              "time"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_messages_profileId_time` ON `${TABLE_NAME}` (`profileId`, `time`)"
+          },
+          {
+            "name": "index_messages_isSaved",
+            "unique": false,
+            "columnNames": [
+              "isSaved"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_messages_isSaved` ON `${TABLE_NAME}` (`isSaved`)"
+          },
+          {
+            "name": "index_messages_isRead",
+            "unique": false,
+            "columnNames": [
+              "isRead"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_messages_isRead` ON `${TABLE_NAME}` (`isRead`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "server_profiles",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "profileId"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      }
+    ],
+    "setupQueries": [
+      "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'be503b797ffc67398f00222c5117c521')"
+    ]
+  }
+}

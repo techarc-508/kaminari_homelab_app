@@ -1,7 +1,7 @@
 # TODO — Kaminari Nfty V1
 
-**Updated:** 2026-11-09, after Phase 3 acceptance and Phase 4 planning.
-Phase 4 is **not authorised**; these are proposed tasks only.
+**Updated:** 2026-11-09, after owner authorization of Phase 4.
+Phase 4 is authorised for **Stage A only**; Stages B–F require owner approval at the Stage A gate.
 
 ## Phase 3 closure (owner/device required)
 
@@ -24,16 +24,17 @@ Phase 3 is accepted as **PASS WITH CONDITIONS**. These conditions are still open
 - [ ] Owner sign-off on the two-mode UI and legacy `SAVED` → `BATTERY_SAVER` migration.
 - [ ] Verify the Android Keystore round-trip on hardware (the two skipped tests).
 
-## Phase 4 — proposed, NOT authorised
+## Phase 4 — Stage A complete; Stages B–F await approval
 
-- [ ] Stage 0: freeze Room v1 schema; add test-only `room-testing`.
-- [ ] Stage A: Room v2 entities, DAOs, `MIGRATION_1_2`, migration test.
+- [x] Stage 0: freeze Room v1 schema; export `1.json`; KSP schema output enabled.
+- [x] Stage A: Room v2 entities, DAOs, `MIGRATION_1_2`, migration test, DAO state-transition tests, schema `2.json`.
+- [ ] Owner review of `PHASE_4_STAGE_A_REPORT.md` and approval to start Stage B.
 - [ ] Stage B: shared `NtfyAuth`, `PublishValidator`, JSON publish client + MockWebServer tests.
-- [ ] Stage C: `ActivityRepository`, receive-event transaction, `OutboxRepository` state machine.
+- [ ] Stage C: `ActivityRepository`, receive-event transaction, `OutboxRepository` state machine, `CommandRepository`.
 - [ ] Stage D: `PublishViewModel`/`ActivityViewModel`/`CommandViewModel`, five-destination navigation, Saved filter, profile switch/preview.
 - [ ] Stage E: `rplab.command.v1` envelope, policy, repository, `MockCommandExecutor`, CommandPanel.
-- [ ] Stage F: full gate, independent QA, `PHASE_4_REPORT.md`.
-- [ ] Owner approval of `PHASE_4_ARCHITECTURE.md` and `PHASE_4_IMPLEMENTATION_PLAN.md` before any code.
+- [ ] Stage F: full gate, independent QA, final `PHASE_4_REPORT.md`.
+- [x] Owner authorization of Phase 4 scope (2026-11-09); Stage A only was authorised in this task.
 
 ## Deferred (owner decision D-05)
 

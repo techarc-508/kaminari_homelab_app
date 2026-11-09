@@ -1,9 +1,11 @@
 # Kaminari Nfty — V1 Product, Architecture & Delivery Plan
 
-**Status:** Planning baseline from the supplied repository snapshot  
+**Status:** Living plan — Phase 3 accepted (PASS WITH CONDITIONS); Phase 4 planned, awaiting owner approval  
 **Target:** First dependable daily-use Android model, not a feature-complete ntfy clone  
 **Platform:** Native Android / Kotlin / Jetpack Compose  
-**Default server URL found in source:** `https://nfty.rplab.qzz.io` (verify this hostname before first live connection)
+**Default server URL found in source:** `https://nfty.rplab.qzz.io` (DNS/TLS verified; origin returned HTTP 502 on 2026-11-08 — re-check before live use)
+
+**Document authority:** this repository-root `PLAN.md` is authoritative. The copy under `KaminariNfty_V1_Plan/` is a mirror and must not diverge. The Phase 1/2 reports are mirrored into the repository root for a self-contained record.
 
 ---
 
@@ -372,17 +374,27 @@ Deliver:
 
 Gate: documented delivery guarantees and device test matrix; no claim of guaranteed instant background delivery unless proven. **Authorized by owner review**
 
-Status (2026-11-09, remediated): implemented and independently re-audited — see `PHASE_3_REPORT.md`, `PHASE_3_REMEDIATION_REPORT.md`, `PHASE_3_FINAL_AUDIT.md`. Delivery modes are now exactly Instant and Battery Saver (legacy `SAVED` migrates to Battery Saver). Android 15 `onTimeout` stops the service before the fatal deadline and falls back to Battery Saver; terminal stream failures stop the service with an honest notification; Instant status is service-owned and visible to the UI; cold-start deep links load by ID from Room. `testDebugUnitTest` 173 tests / 0 failures / 2 pre-existing skips, `assembleDebug` SUCCESS (19,557,690 B), `lint` 0 errors / 56 warnings. Device test matrix (Doze, reboot, Android 15 timeout, OEM battery managers) still pending; Phase 4 awaits explicit owner approval.
+Status (2026-11-09, remediated): implemented and independently re-audited — see `PHASE_3_REPORT.md`, `PHASE_3_AUDIT_REPORT.md`, `PHASE_3_REMEDIATION_REPORT.md`, `PHASE_3_FINAL_AUDIT.md`.
+
+**Owner acceptance (2026-11-09): ACCEPTED — PASS WITH CONDITIONS.** See `PHASE_3_ACCEPTANCE.md`. The original audit FAIL and the remediation are preserved, not rewritten. Delivery modes are exactly Instant and Battery Saver (legacy `SAVED` migrates to Battery Saver). Android 15 `onTimeout` stops the service before the fatal deadline and falls back to Battery Saver; terminal stream failures stop the service with an honest notification; Instant status is service-owned and visible to the UI; cold-start deep links load by ID from Room. `testDebugUnitTest` 173 tests / 0 failures / 2 pre-existing skips, `assembleDebug` SUCCESS (19,557,690 B), `lint` 0 errors / 56 warnings.
+
+**Acceptance conditions (open):** no device or emulator validation; Doze, reboot, OEM battery managers, notification rendering and the real Android 15 `dataSync` timeout are unverified; the real ntfy server smoke test is blocked by HTTP 502; Android Keystore round-trip is unverified on hardware. Do not claim hardware validation.
 
 ### Phase 4 — Compose, activity and command centre
 
-Deliver:
-- Inbox/topic UX wired to Room.
-- Compose/publish screen and send outbox.
-- Activity timeline for receive, send, server acceptance, command request and result.
-- Safe command envelope and executor integration contract; mock executor first.
+**Status: planned — not authorised. Do not implement until the owner explicitly approves `PHASE_4_ARCHITECTURE.md` and `PHASE_4_IMPLEMENTATION_PLAN.md`.**
 
-Gate: full round trip demonstrated with correlation ID and honest state labels.
+Deliver:
+- Inbox/topic UX wired to Room, including unread counts, search and the Saved filter.
+- Compose/publish screen with title, topic, priority, tags, URL/metadata attachments, view actions and server-supported scheduling.
+- Durable Room-backed outbox with `QUEUED` / `SENDING` / `ACCEPTED` / `FAILED` / `AMBIGUOUS`, explicit retry controls and honest delivery labels.
+- Activity timeline for receive, publish, retry, server acceptance and command request/result, with bounded retention.
+- Safe typed command envelope (`rplab.command.v1`), allowlist, expiry, single-use nonce, destructive-action confirmation and a **mock** executor only.
+- Multiple server profiles with clear active identity, safe switching and a URL-change preview.
+
+Gate: full publish round trip demonstrated with a correlation ID and honest state labels; migration test passes or is recorded as device-blocked; independent QA audit.
+
+**Phase scope correction:** E-Ink belongs to Phase 5 (low-end/E-Ink). ntfy administration and the PVE command gateway belong to Phase 6. Phase 4 does not implement binary attachment upload, automatic background publish retries, real PVE execution, ntfy administration, E-Ink tuning or release signing. This section supersedes the earlier handoff wording.
 
 ### Phase 5 — E-Ink and low-resource profiles
 
@@ -496,15 +508,42 @@ Targets are engineering goals, not promises until measured on real hardware.
 
 ## 13. Risks and decisions requiring owner approval
 
-1. **App identity:** confirm final package/application ID before signing and distributing. Changing it later creates a separate app install.
-2. **Server host:** verify `nfty.rplab.qzz.io` is the correct live hostname and certificate.
+1. **App identity — RESOLVED (D2′, 2026-11-08):** namespace and applicationId are `com.rplab.kaminarinfty`. Do not rename before signing; a later change creates a separate app install.
+2. **Server host:** `nfty.rplab.qzz.io` DNS/TLS verified. The origin returned HTTP 502 on 2026-11-08; re-check when the host is up and pin `ntfy version` before enabling version-specific behavior.
 3. **Background delivery is locked:** support both Instant foreground delivery and Battery Saver scheduled reconciliation; optional FCM/UnifiedPush may be evaluated as an additional transport. There is no free, guaranteed, zero-power always-on delivery path on modern Android.
 4. **Admin scope is locked:** both ntfy administration (within verified API capabilities) and a separate PVE/homelab gateway are required; phase them after the core client.
-5. **Command safety:** define the exact allowlisted PVE/home-lab actions and the executor trust boundary before implementation.
+5. **Command safety:** Phase 4 defines the typed envelope and a mock executor; the real allowlist, gateway deployment and executor trust boundary are Phase 6. No shell, SQL, PVE or arbitrary HTTP execution.
 6. **E-Ink device is pending:** the Onyx Boox has not arrived and its model is unknown. Keep generic E-Ink implementation model-agnostic; record model, Android version and firmware before device-specific refresh work.
 7. **Minimum Android:** validate API 24 support against dependency and target policy constraints.
 8. **Server version:** pin a tested ntfy version/API capability set; do not assume undocumented admin endpoints are stable.
 
-## 14. Immediate next action
+## 14. Phase status log (living)
 
-Run the supplied `START_PROMPT.md` with Codex or OpenCode in the Linux Mint development VM. The first agent session must be read-only: inspect the entire repository, verify the build environment and server API assumptions, write a current-state audit report, and propose an implementation sequence. It must not start Phase 1 or modify application code until the owner approves the audit and plan.
+| Phase | Status | Evidence |
+|---|---|---|
+| Phase 0 — reproducible baseline / audit | Complete | `AUDIT_REPORT.md`, `CURRENT_ARCHITECTURE.md`, `API_CAPABILITY_MATRIX.md`, `PHASE_0_EXECUTION_PLAN.md`, `PHASE_0_REPORT.md` |
+| Phase 1 — architecture and data foundation | Complete, approved | `PHASE_1_REPORT.md`; Room/DataStore/Keystore, demo isolation |
+| Phase 2 — ntfy API correctness | Complete, locally verified; real-server smoke test pending | `PHASE_2_REPORT.md`, `PHASE_2_GATE_REPORT.md`; commit `5d00827` |
+| Phase 3 — notification and background delivery | **ACCEPTED — PASS WITH CONDITIONS** (2026-11-09) | `PHASE_3_REPORT.md`, `PHASE_3_AUDIT_REPORT.md`, `PHASE_3_REMEDIATION_REPORT.md`, `PHASE_3_FINAL_AUDIT.md`, `PHASE_3_ACCEPTANCE.md` |
+| Phase 4 — Compose, activity and command centre | **Planned; awaiting owner approval** | `PHASE_4_ARCHITECTURE.md`, `PHASE_4_IMPLEMENTATION_PLAN.md` |
+| Phase 5 — low-end/E-Ink | Not started | Owner decision `D-04`: generic E-Ink until the Boox arrives |
+| Phase 6 — administration/security | Not started | ntfy admin + separate trusted PVE gateway |
+| Phase 7 — release/QA | Not started | Signed `dist/` APK is the final gate |
+
+**Final Phase 3 verification (2026-11-09, each task run separately with `--rerun-tasks`):**
+
+```text
+./gradlew testDebugUnitTest   # exit 0 — 173 tests, 0 failures, 0 errors, 2 pre-existing skips
+./gradlew assembleDebug       # exit 0 — app-debug.apk, 19,557,690 bytes
+./gradlew lint                # exit 0 — 0 errors, 56 warnings
+```
+
+The host OOMs when test/build/lint are combined (7.8 GiB RAM, swap exhausted); run them separately. No device or emulator is available, so hardware validation remains outstanding.
+
+**Phase 3 conditions (open):** device matrix (permission grant/deny, screen-off Instant, Android 15 six-hour cutoff, terminal auth failure, Battery Saver cadence/Doze, duplicate-free 24 h, mode switching, reboot per mode, process death, network loss/recovery, cold/warm taps, OEM battery managers); real ntfy server smoke test (HTTP 502 blocker); Keystore round-trip on hardware.
+
+**Historical note:** the original first-session instruction (run `START_PROMPT.md` read-only) was executed in Phase 0; its output is the audit set above.
+
+## 15. Immediate next action
+
+Owner review of `PHASE_3_ACCEPTANCE.md`, `PHASE_4_ARCHITECTURE.md` and `PHASE_4_IMPLEMENTATION_PLAN.md`. Approve, amend or reject the Phase 4 scope. Do not implement Phase 4 until explicit approval is recorded. The device matrix and the real-server smoke test remain owner/hardware-gated and are not Phase 4 code work.

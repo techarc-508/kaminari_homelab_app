@@ -1,6 +1,6 @@
 # Risk Register — Kaminari Nfty V1
 
-**Last updated:** 2026-11-09 (Phase 3 remediation)
+**Last updated:** 2026-11-09 (Phase 3 accepted; Phase 4 planned)
 Severity reflects user impact; state reflects what is verified.
 
 | ID | Risk | Severity | State / mitigation |
@@ -20,3 +20,10 @@ Severity reflects user impact; state reflects what is verified.
 | R-13 | **E-Ink profile and vendor behavior unknown** until the Boox device arrives. | Medium (Phase 4+) | Deferred by owner decision D-04; do not invent capabilities. |
 | R-14 | **Real ntfy server version / self-hosted smoke test** remains unverified. | Medium | Phase 2 condition; run against the actual server before release claims. |
 | R-15 | **Secrets/Keystore availability** (Robolectric skips the KeyStore round-trip; a device Keystore issue would block credentials). | High | Unit tests cover fallback behavior; verify credential save/load on hardware. |
+| R-16 | **Publish ambiguity:** a timeout after the request may have reached the server; ntfy has no idempotency key, so a retry can duplicate a message. | High | Phase 4 design: `AMBIGUOUS` state, manual retry only, explicit duplicate-risk confirmation. Accepted, not eliminable client-side. |
+| R-17 | **Real-server publish/receive unverified:** `nfty.rplab.qzz.io` returned HTTP 502 on 2026-11-08. | High | Open. Re-probe when the origin is up; run the Phase 2 smoke test and a publish round trip before release claims. |
+| R-18 | **Room v2 is forward-only:** a v1 build cannot open a v2 database; downgrade would fail. | Medium | Accepted by design (no destructive fallback). Add v3 migrations for fixes; never downgrade on a user device. Test `Migration1To2Test`. |
+| R-19 | **Mock executor could be mistaken for real execution.** | Medium | Mitigated: mandatory “MOCK — no real execution” banner, `mock: true` results, no network/shell code. Real gateway is Phase 6. |
+| R-20 | **Command replay/expiry bypass if a future executor trusts the app blindly.** | High (Phase 6) | Envelope requires single-use nonce, ±60 s issue window, 5 min expiry, allowlist, explicit confirmation. The gateway must re-validate independently. |
+| R-21 | **Activity/outbox growth on a low-RAM device.** | Medium | Bounded queries and retention: activity 90 days/5,000 rows per profile; outbox 30 days/500 terminal entries; never prune queued work. Measure on hardware. |
+| R-22 | **No automatic publish retry:** a failed publish waits for the user. | Low | Accepted Phase 4 default; automatic retry needs an idempotency design and is deferred. |

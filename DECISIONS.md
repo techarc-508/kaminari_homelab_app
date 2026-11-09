@@ -14,6 +14,9 @@ Append-only record of owner decisions and the technical choices that follow from
 | D-06 | The `NftyTopBar` live-clock fix belongs in Phase 3, with regression evidence. | Owner review, 2026-11-09 |
 | D-07 | Instant is best-effort live delivery subject to Android/OEM restrictions; Battery Saver is inexact periodic catch-up. No guarantee of instant delivery. | Owner review, 2026-11-09 |
 | D-08 | Phase 4 is **not authorised** until explicit owner approval. | Owner checkpoint instruction |
+| D-09 | Phase 3 is **ACCEPTED — PASS WITH CONDITIONS** (2026-11-09). The original FAIL and remediation history are preserved. No hardware validation may be claimed. | Owner instruction, 2026-11-09; `PHASE_3_ACCEPTANCE.md` |
+| D-10 | The repository-root `PLAN.md` is authoritative; the plan-folder copy is a mirror. Phase 1/2 reports are mirrored into the repository for a self-contained record. | Owner instruction, 2026-11-09 |
+| D-11 | Phase 4 default scope: publish with URL/metadata attachments (binary upload deferred), durable outbox, activity timeline, typed command envelope with **mock** executor, Room-backed inbox/topic UX, multiple profiles with safe switching and a migration/URL-change preview. Proposed, not authorised. | Owner instruction, 2026-11-09 |
 
 ## Technical decisions (Phase 3 remediation, 2026-11-09)
 
@@ -33,3 +36,20 @@ Append-only record of owner decisions and the technical choices that follow from
 1. Whether to add notification actions (mark read/save) in Phase 4.
 2. Whether to pursue an FCM/UnifiedPush fallback (optional in PLAN).
 3. E-Ink profile specifics once the Boox model/firmware is known.
+4. Phase 4: approve JSON-root publish, `view`-only actions, manual-only outbox
+   retry, mock-only command centre and the profile URL-change preview
+   (`PHASE_4_ARCHITECTURE.md` §16).
+5. Phase 4: confirm whether Saved remains an Inbox filter (recommended) or a
+   bottom destination.
+6. Phase 6: real allowlisted PVE actions and gateway trust boundary.
+
+## Documentation reconciliation (2026-11-09)
+
+- Two divergent `PLAN.md` copies existed. The repository-root copy is canonical;
+  the plan-folder copy is now a mirror (cycle 2).
+- `PHASE_1_REPORT.md`, `PHASE_2_REPORT.md` and `PHASE_2_GATE_REPORT.md` were
+  mirrored into the repository root; no duplicate copies are maintained in the
+  root.
+- The handoff's phase-scope wording conflated Phase 4 with E-Ink and
+  administration. `PLAN.md` is authoritative: E-Ink is Phase 5, ntfy admin and
+  the PVE gateway are Phase 6.

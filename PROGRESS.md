@@ -5,7 +5,7 @@
 **Branch:** `main`
 **HEAD before Phase 3 checkpoint:** `5d00827` — Phase 2 remediation
 **Phase 3 checkpoint:** `72dbf36`
-**Phase 4:** Stage C complete (outbox and activity orchestration); Stages D–F require explicit owner approval.
+**Phase 4:** Stage D complete (integrated Compose UI); Stages E–F require explicit owner approval.
 
 ---
 
@@ -17,7 +17,7 @@
 | Phase 1 — architecture and data foundation | Complete, approved | `PHASE_1_REPORT.md`; Room/DataStore/Keystore, demo isolation |
 | Phase 2 — ntfy API correctness | Complete, locally verified; real-server smoke test still valuable | `PHASE_2_REPORT.md`, `PHASE_2_GATE_REPORT.md`; commit `5d00827` |
 | Phase 3 — notification and background delivery | **ACCEPTED — PASS WITH CONDITIONS** (owner, 2026-11-09) | `PHASE_3_REPORT.md`, `PHASE_3_AUDIT_REPORT.md`, `PHASE_3_REMEDIATION_REPORT.md`, `PHASE_3_FINAL_AUDIT.md`, `PHASE_3_ACCEPTANCE.md` |
-| Phase 4 — Compose/activity/command centre | **Stage C complete; Stages D–F pending approval** | `PHASE_4_ARCHITECTURE.md`, `PHASE_4_IMPLEMENTATION_PLAN.md`, `PHASE_4_STAGE_A_REPORT.md`, `PHASE_4_STAGE_B_REPORT.md`, `PHASE_4_STAGE_C_REPORT.md` |
+| Phase 4 — Compose/activity/command centre | **Stage D complete; Stages E–F pending approval** | `PHASE_4_ARCHITECTURE.md`, `PHASE_4_IMPLEMENTATION_PLAN.md`, `PHASE_4_STAGE_A_REPORT.md`, `PHASE_4_STAGE_B_REPORT.md`, `PHASE_4_STAGE_C_REPORT.md`, `PHASE_4_STAGE_D_REPORT.md` |
 | Phase 5 — low-end/E-Ink | Not started | Generic E-Ink only until the Boox model/firmware is known |
 | Phase 6 — administration/security | Not started | ntfy admin + separate trusted PVE gateway |
 | Phase 7 — release/QA | Not started | Signed `dist/KaminariNfty-v1.0.0.apk` is the final gate |
@@ -117,7 +117,7 @@ MockWebServer only. No device available. See `PHASE_4_STAGE_B_REPORT.md`.
 
 ## Phase 4 — Stage C (2026-11-10)
 
-**Status: Complete.** Outbox and activity orchestration only; Stage D not started.
+**Status: Complete.** Outbox and activity orchestration only; at that checkpoint Stage D had not started.
 
 - Added `data/repository/OutboxRepository.kt` (`OutboxRepository`,
   `SendOutcome`, `RoomOutboxRepository`) around the existing conditional DAO
@@ -166,6 +166,60 @@ Real-server and hardware verification remain outstanding. See
 `PHASE_4_STAGE_C_REPORT.md`.
 
 
+## Phase 4 — Stage D (2026-11-10)
+
+**Status: Complete.** Integrated Compose UI only; Stage E not started.
+
+- Added six primary destinations: Inbox, Topics, Compose, Outbox, Activity and
+  Settings, with a compact weighted bottom bar. Detail, search and setup remain
+  drill-in destinations. No command tab or command UI exists.
+- Added `PublishViewModel` and `PublishScreen`: topic/title/body, priority 1–5,
+  tags, click URL, attachment URL metadata, delay, pre-enqueue validation,
+  accepted/failed/ambiguous outcomes, server-acceptance wording, duplicate-tap
+  guard, draft preservation after failure, and confirmation before ambiguous
+  retry.
+- Added `OutboxScreen` with profile-scoped statuses, timestamps, attempts,
+  failure text, manual retry only, ambiguous confirmation and safe removal of
+  unsent rows. No automatic retry or resend path exists.
+- Added `ActivityViewModel` and `ActivityScreen`: profile-scoped Room timeline,
+  All/Publish/Inbox/Attention filters, empty/loading states and sanitized
+  summaries only.
+- Inbox now exposes Saved as a filter and includes inline search and refresh;
+  read/unread, save, detail, delete/clear confirmations and profile isolation
+  remain intact.
+- Topics adds empty/error states, unsubscribe confirmation, a shared add dialog
+  and topic-to-Inbox navigation. The current model has no priority-threshold
+  field, so none was invented.
+- Settings now lists profiles, marks the active one, supports add/edit/select,
+  tests the active connection, and keeps delivery modes, notification status,
+  theme/density, local-data actions and privacy copy. URL changes still open the
+  counts preview and never move/merge/delete data. Creating a new profile for a
+  changed URL requires credential re-entry rather than silently copying a
+  stored secret.
+- `MainViewModel` holds the new navigation/profile-edit state, sanitizes server
+  configs, performs the safe switch sequence and supplies URL-preview counts;
+  `OutboxRepository.count` and `PublishValidator.validateRequest` support these
+  paths without adding a database or network call to a Composable.
+- No new dependency, migration, schema change, command execution or binary
+  upload. Stage E remains unimplemented.
+
+**Tests added:** 36 — `PublishViewModelTest` 9, `ActivityViewModelTest` 6,
+`MainViewModelTest` 3, `PublishScreenTest` 5, `OutboxScreenTest` 4,
+`ActivityScreenTest` 3, `SettingsScreenTest` 3, `InboxScreenTest` 2,
+`BottomNavigationBarTest` 1.
+
+**Verified (final code):**
+
+```text
+./gradlew testDebugUnitTest --rerun-tasks  # exit 0 — 322 tests, 0 failures, 0 errors, 2 pre-existing skips
+./gradlew assembleDebug                    # exit 0 — app-debug.apk 19,950,553 bytes
+./gradlew lintDebug                        # exit 0 — 0 errors, 56 warnings
+```
+
+No device/emulator or real-server validation is available. See
+`PHASE_4_STAGE_D_REPORT.md`.
+
+
 ## Documentation authority
 
 - `PLAN.md` in the repository root is authoritative; the plan-folder copy is a
@@ -183,13 +237,14 @@ Real-server and hardware verification remain outstanding. See
   are committed in `93c34d1`; the hygiene fix is `bc6b6cd`; decision cleanup is
   `4140ca0`.
 - Stage A is checkpointed in `db6e77a`; Stage A.1 in `49e3159`; Stage B in
-  `675ec14`; Stage C in `85186f9` (see `PHASE_4_STAGE_C_REPORT.md`).
+  `675ec14`; Stage C in `85186f9`; Stage D is recorded in
+  `PHASE_4_STAGE_D_REPORT.md` (hash filled in the follow-up docs commit).
 - Never reset/clean the repository; do not rewrite history.
 
 ## Next
 
-1. Owner review of `PHASE_4_STAGE_C_REPORT.md` and the Stage C diff.
-2. Owner approval before Stage D (publish/activity/command ViewModels, five
-   destinations, Saved filter, profile switching and URL-change preview).
+1. Owner review of `PHASE_4_STAGE_D_REPORT.md` and the Stage D diff.
+2. Owner approval before Stage E (command envelope, policy, repository, mock
+   executor and CommandPanel).
 3. Device test matrix in `PHASE_3_REPORT.md` §6 remains owner/hardware-gated.
-4. Real publish smoke test once the ntfy origin is healthy (R-17).
+4. Real publish/receive smoke test once the ntfy origin is healthy (R-17).

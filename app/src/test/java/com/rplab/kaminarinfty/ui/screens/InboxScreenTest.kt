@@ -6,6 +6,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import com.rplab.kaminarinfty.InboxFilter
 import com.rplab.kaminarinfty.model.AuthState
+import com.rplab.kaminarinfty.model.NftyMessage
 import com.rplab.kaminarinfty.ui.theme.MyApplicationTheme
 import org.junit.Rule
 import org.junit.Test
@@ -21,9 +22,11 @@ class InboxScreenTest {
     val composeRule = createComposeRule()
 
     private fun setInbox(
-        messages: List<com.rplab.kaminarinfty.model.NftyMessage> = emptyList(),
+        messages: List<NftyMessage> = emptyList(),
         authState: AuthState = AuthState.NOT_CONFIGURED,
         customErrorMessage: String? = null,
+        activeFilter: InboxFilter = InboxFilter.ALL,
+        searchQuery: String = "",
     ) {
         composeRule.setContent {
             MyApplicationTheme(darkTheme = false) {
@@ -31,10 +34,11 @@ class InboxScreenTest {
                     messages = messages,
                     serverUrl = "https://ntfy.test",
                     authState = authState,
-                    activeFilter = InboxFilter.ALL,
+                    activeFilter = activeFilter,
                     selectedTopicFilter = null,
                     isSampleData = false,
                     customErrorMessage = customErrorMessage,
+                    searchQuery = searchQuery,
                     onFilterChange = {},
                     onClearTopicFilter = {},
                     onMessageClick = {},
@@ -77,4 +81,46 @@ class InboxScreenTest {
             "Connected as guest. Messages published to subscribed topics will appear here."
         ).assertIsDisplayed()
     }
+
+    @Test
+    fun `saved filter shows only saved messages`() {
+        setInbox(
+            messages = listOf(
+                message(id = "saved", title = "Saved item", body = "keep me", saved = true),
+                message(id = "plain", title = "Plain item", body = "not saved", saved = false),
+            ),
+            activeFilter = InboxFilter.SAVED,
+        )
+
+        composeRule.onNodeWithText("Saved item").assertIsDisplayed()
+        composeRule.onNodeWithText("Plain item").assertDoesNotExist()
+    }
+
+    @Test
+    fun `search filters by body without touching persisted state`() {
+        setInbox(
+            messages = listOf(
+                message(id = "needle", title = "Needle", body = "disk full on node one"),
+                message(id = "other", title = "Other", body = "routine backup"),
+            ),
+            searchQuery = "disk full",
+        )
+
+        composeRule.onNodeWithText("Needle").assertIsDisplayed()
+        composeRule.onNodeWithText("Other").assertDoesNotExist()
+    }
+
+    private fun message(
+        id: String,
+        title: String,
+        body: String,
+        saved: Boolean = false,
+    ) = NftyMessage(
+        id = id,
+        time = System.currentTimeMillis(),
+        topic = "ops",
+        title = title,
+        message = body,
+        isSaved = saved,
+    )
 }

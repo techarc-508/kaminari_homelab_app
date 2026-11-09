@@ -46,8 +46,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.rplab.kaminarinfty.model.AuthState
+import com.rplab.kaminarinfty.model.NftyErrorCategory
 import com.rplab.kaminarinfty.model.NftyTopic
 import com.rplab.kaminarinfty.model.TopicPermission
+import com.rplab.kaminarinfty.ui.components.NftyConfirmationSheet
+import com.rplab.kaminarinfty.ui.components.NftyEmptyState
+import com.rplab.kaminarinfty.ui.components.NftyErrorState
 import com.rplab.kaminarinfty.ui.components.NftyTopBar
 import com.rplab.kaminarinfty.ui.theme.JetBrainsMonoFontFamily
 import com.rplab.kaminarinfty.ui.theme.KaminariTheme
@@ -58,10 +62,13 @@ fun TopicsScreen(
     topics: List<NftyTopic>,
     authState: AuthState,
     isSampleData: Boolean,
+    errorCategory: NftyErrorCategory = NftyErrorCategory.UNREACHABLE,
+    customErrorMessage: String? = null,
     onTopicSelected: (String) -> Unit,
     onToggleSubscription: (String) -> Unit,
     onTogglePause: (String) -> Unit,
     onAddTopic: (String, String) -> Unit,
+    onRetryStream: (() -> Unit)? = null,
     onSearchClick: () -> Unit,
     onToggleThemeClick: () -> Unit,
     onSettingsClick: () -> Unit,
@@ -71,6 +78,7 @@ fun TopicsScreen(
     var newTopicName by remember { mutableStateOf("") }
     var newTopicDesc by remember { mutableStateOf("") }
     var nameError by remember { mutableStateOf<String?>(null) }
+    var pendingUnsubscribe by remember { mutableStateOf<NftyTopic?>(null) }
 
     Column(
         modifier = modifier
@@ -136,6 +144,52 @@ fun TopicsScreen(
         }
 
         // Topics List
+        if (topics.isEmpty()) {
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center,
+            ) {
+                if (authState == AuthState.AUTHENTICATION_FAILED ||
+                    authState == AuthState.PERMISSION_DENIED ||
+                    customErrorMessage != null
+                ) {
+                    NftyErrorState(
+                        errorCategory = errorCategory,
+                        customMessage = customErrorMessage,
+                        onRetryClick = onRetryStream,
+                    )
+                } else {
+                    NftyEmptyState(
+                        title = "No topics subscribed",
+                        message = "Add the ntfy topic this device should listen to. Topic names are not secrets by themselves.",
+                        technicalCode = "TOPICS // 0_ACTIVE",
+                        actionLabel = "Add Topic",
+                        onActionClick = { showAddDialog = true },
+                    )
+                }
+            }
+            if (showAddDialog) {
+                AddTopicDialog(
+                    name = newTopicName,
+                    description = newTopicDesc,
+                    nameError = nameError,
+                    onNameChange = {
+                        newTopicName = it
+                        nameError = if (it.isBlank()) "Topic name cannot be empty" else null
+                    },
+                    onDescriptionChange = { newTopicDesc = it },
+                    onDismiss = { showAddDialog = false },
+                    onConfirm = {
+                        onAddTopic(newTopicName, newTopicDesc)
+                        newTopicName = ""
+                        newTopicDesc = ""
+                        showAddDialog = false
+                    },
+                )
+            }
+            return
+        }
+
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
@@ -237,11 +291,18 @@ fun TopicsScreen(
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(10.dp),
                             ) {
-                                Text(
-                                    text = "${topic.messageCount} messages cached",
-                                    style = KaminariTheme.techTypography.metricSubtext,
-                                    color = KaminariTheme.colors.textSecondary,
-                                )
+                                Column {
+                                    Text(
+                                        text = "${topic.messageCount} messages cached",
+                                        style = KaminariTheme.techTypography.metricSubtext,
+                                        color = KaminariTheme.colors.textSecondary,
+                                    )
+                                    Text(
+                                        text = "Priority filter: all",
+                                        style = KaminariTheme.techTypography.metricSubtext,
+                                        color = KaminariTheme.colors.textSecondary.copy(alpha = 0.7f),
+                                    )
+                                }
 
                                 if (topic.isSubscribed) {
                                     Box(
@@ -285,7 +346,13 @@ fun TopicsScreen(
                                 )
                                 Switch(
                                     checked = topic.isSubscribed,
-                                    onCheckedChange = { onToggleSubscription(topic.name) },
+                                    onCheckedChange = {
+                                        if (topic.isSubscribed) {
+                                            pendingUnsubscribe = topic
+                                        } else {
+                                            onToggleSubscription(topic.name)
+                                        }
+                                    },
                                     colors = SwitchDefaults.colors(checkedThumbColor = KaminariTheme.colors.accent),
                                     modifier = Modifier.testTag("switch_topic_${topic.name}")
                                 )
@@ -303,88 +370,125 @@ fun TopicsScreen(
 
     // Add Topic Dialog
     if (showAddDialog) {
-        AlertDialog(
-            onDismissRequest = { showAddDialog = false },
-            containerColor = KaminariTheme.colors.surfaceMain,
-            title = {
-                Text(
-                    text = "Subscribe to Topic",
-                    fontFamily = RubikFontFamily,
-                    fontWeight = FontWeight.Bold,
-                    color = KaminariTheme.colors.textPrimary,
-                )
+        AddTopicDialog(
+            name = newTopicName,
+            description = newTopicDesc,
+            nameError = nameError,
+            onNameChange = {
+                newTopicName = it
+                nameError = if (it.isBlank()) "Topic name cannot be empty" else null
             },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text(
-                        text = "Enter the topic name configured on your ntfy server (e.g. homelab-alerts). Names should use lowercase letters, numbers, hyphens, and underscores.",
-                        fontFamily = RubikFontFamily,
-                        fontSize = 12.sp,
-                        color = KaminariTheme.colors.textSecondary,
-                        lineHeight = 16.sp,
-                    )
-
-                    OutlinedTextField(
-                        value = newTopicName,
-                        onValueChange = {
-                            newTopicName = it
-                            nameError = if (it.isBlank()) "Topic name cannot be empty" else null
-                        },
-                        label = { Text("Topic Name", fontFamily = RubikFontFamily) },
-                        prefix = { Text("#", fontFamily = JetBrainsMonoFontFamily, color = KaminariTheme.colors.accent) },
-                        isError = nameError != null,
-                        supportingText = nameError?.let { { Text(it, color = KaminariTheme.colors.error) } },
-                        singleLine = true,
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = KaminariTheme.colors.accent,
-                            unfocusedBorderColor = KaminariTheme.colors.border,
-                        ),
-                        modifier = Modifier.fillMaxWidth().testTag("add_topic_name_input")
-                    )
-
-                    OutlinedTextField(
-                        value = newTopicDesc,
-                        onValueChange = { newTopicDesc = it },
-                        label = { Text("Description (Optional)", fontFamily = RubikFontFamily) },
-                        singleLine = true,
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = KaminariTheme.colors.accent,
-                            unfocusedBorderColor = KaminariTheme.colors.border,
-                        ),
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                }
+            onDescriptionChange = { newTopicDesc = it },
+            onDismiss = { showAddDialog = false },
+            onConfirm = {
+                onAddTopic(newTopicName, newTopicDesc)
+                newTopicName = ""
+                newTopicDesc = ""
+                showAddDialog = false
             },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        val sanitized = newTopicName.trim().lowercase().replace(Regex("[^a-z0-9_-]"), "")
-                        if (sanitized.isNotBlank()) {
-                            onAddTopic(sanitized, newTopicDesc)
-                            newTopicName = ""
-                            newTopicDesc = ""
-                            showAddDialog = false
-                        } else {
-                            nameError = "Valid topic name required"
-                        }
-                    },
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = KaminariTheme.colors.accent,
-                        contentColor = KaminariTheme.colors.background,
-                    ),
-                    modifier = Modifier.testTag("dialog_confirm_add_topic"),
-                ) {
-                    Text("Subscribe", fontFamily = RubikFontFamily, fontWeight = FontWeight.Bold)
-                }
-            },
-            dismissButton = {
-                OutlinedButton(
-                    onClick = { showAddDialog = false },
-                    border = androidx.compose.foundation.BorderStroke(1.dp, KaminariTheme.colors.border),
-                ) {
-                    Text("Cancel", fontFamily = RubikFontFamily, color = KaminariTheme.colors.textSecondary)
-                }
-            }
         )
     }
+
+    pendingUnsubscribe?.let { topic ->
+        NftyConfirmationSheet(
+            title = "Unsubscribe from #${topic.name}?",
+            message = "This stops future live and background delivery for the topic. Cached messages stay on this device.",
+            confirmLabel = "Unsubscribe",
+            isDestructive = true,
+            onConfirm = {
+                onToggleSubscription(topic.name)
+                pendingUnsubscribe = null
+            },
+            onDismiss = { pendingUnsubscribe = null },
+        )
+    }
+}
+
+@Composable
+private fun AddTopicDialog(
+    name: String,
+    description: String,
+    nameError: String?,
+    onNameChange: (String) -> Unit,
+    onDescriptionChange: (String) -> Unit,
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = KaminariTheme.colors.surfaceMain,
+        title = {
+            Text(
+                text = "Subscribe to Topic",
+                fontFamily = RubikFontFamily,
+                fontWeight = FontWeight.Bold,
+                color = KaminariTheme.colors.textPrimary,
+            )
+        },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(
+                    text = "Enter the topic name configured on your ntfy server (e.g. homelab-alerts). Names should use lowercase letters, numbers, hyphens, and underscores.",
+                    fontFamily = RubikFontFamily,
+                    fontSize = 12.sp,
+                    color = KaminariTheme.colors.textSecondary,
+                    lineHeight = 16.sp,
+                )
+
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = onNameChange,
+                    label = { Text("Topic Name", fontFamily = RubikFontFamily) },
+                    prefix = {
+                        Text(
+                            "#",
+                            fontFamily = JetBrainsMonoFontFamily,
+                            color = KaminariTheme.colors.accent,
+                        )
+                    },
+                    isError = nameError != null,
+                    supportingText = nameError?.let { { Text(it, color = KaminariTheme.colors.error) } },
+                    singleLine = true,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = KaminariTheme.colors.accent,
+                        unfocusedBorderColor = KaminariTheme.colors.border,
+                    ),
+                    modifier = Modifier.fillMaxWidth().testTag("add_topic_name_input")
+                )
+
+                OutlinedTextField(
+                    value = description,
+                    onValueChange = onDescriptionChange,
+                    label = { Text("Description (Optional)", fontFamily = RubikFontFamily) },
+                    singleLine = true,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = KaminariTheme.colors.accent,
+                        unfocusedBorderColor = KaminariTheme.colors.border,
+                    ),
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = onConfirm,
+                enabled = name.isNotBlank(),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = KaminariTheme.colors.accent,
+                    contentColor = KaminariTheme.colors.background,
+                ),
+                modifier = Modifier.testTag("dialog_confirm_add_topic"),
+            ) {
+                Text("Subscribe", fontFamily = RubikFontFamily, fontWeight = FontWeight.Bold)
+            }
+        },
+        dismissButton = {
+            OutlinedButton(
+                onClick = onDismiss,
+                border = androidx.compose.foundation.BorderStroke(1.dp, KaminariTheme.colors.border),
+            ) {
+                Text("Cancel", fontFamily = RubikFontFamily, color = KaminariTheme.colors.textSecondary)
+            }
+        }
+    )
 }

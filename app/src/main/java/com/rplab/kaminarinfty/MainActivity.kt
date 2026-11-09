@@ -40,9 +40,12 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.rplab.kaminarinfty.delivery.NftyNotifier
 import com.rplab.kaminarinfty.ui.components.NftyConfirmationSheet
 import com.rplab.kaminarinfty.ui.navigation.NftyBottomNavigationBar
+import com.rplab.kaminarinfty.ui.screens.ActivityScreen
 import com.rplab.kaminarinfty.ui.screens.InboxScreen
 import com.rplab.kaminarinfty.ui.screens.NotificationDetailScreen
-import com.rplab.kaminarinfty.ui.screens.SavedScreen
+import com.rplab.kaminarinfty.ui.screens.OutboxScreen
+import com.rplab.kaminarinfty.ui.screens.ProfileChangePreviewDialog
+import com.rplab.kaminarinfty.ui.screens.PublishScreen
 import com.rplab.kaminarinfty.ui.screens.SearchScreen
 import com.rplab.kaminarinfty.ui.screens.SettingsScreen
 import com.rplab.kaminarinfty.ui.screens.SetupScreen
@@ -63,7 +66,13 @@ class MainActivity : ComponentActivity() {
         setContent {
             val container = (application as KaminariApp).container
             val mainViewModel: MainViewModel = viewModel(factory = MainViewModelFactory(container))
+            val publishViewModel: PublishViewModel =
+                viewModel(factory = PublishViewModelFactory(container))
+            val activityViewModel: ActivityViewModel =
+                viewModel(factory = ActivityViewModelFactory(container))
             val uiState by mainViewModel.uiState.collectAsStateWithLifecycle()
+            val publishState by publishViewModel.uiState.collectAsStateWithLifecycle()
+            val activityState by activityViewModel.uiState.collectAsStateWithLifecycle()
             val context = LocalContext.current
             val notificationsEnabled = rememberNotificationsEnabled()
 
@@ -99,8 +108,12 @@ class MainActivity : ComponentActivity() {
 
             MyApplicationTheme(darkTheme = isDarkTheme) {
                 KaminariApp(
-                    viewModel = mainViewModel,
+                    mainViewModel = mainViewModel,
                     uiState = uiState,
+                    publishViewModel = publishViewModel,
+                    publishState = publishState,
+                    activityViewModel = activityViewModel,
+                    activityState = activityState,
                     isDarkTheme = isDarkTheme,
                     notificationsEnabled = notificationsEnabled,
                     onOpenNotificationSettings = {
@@ -151,8 +164,12 @@ private fun rememberNotificationsEnabled(): Boolean {
 
 @Composable
 fun KaminariApp(
-    viewModel: MainViewModel,
+    mainViewModel: MainViewModel,
     uiState: MainUiState,
+    publishViewModel: PublishViewModel,
+    publishState: PublishUiState,
+    activityViewModel: ActivityViewModel,
+    activityState: ActivityUiState,
     isDarkTheme: Boolean,
     notificationsEnabled: Boolean,
     onOpenNotificationSettings: () -> Unit,
@@ -160,20 +177,38 @@ fun KaminariApp(
     val context = LocalContext.current
     val snackbarHostState = remember { SnackbarHostState() }
 
+    var messageToDelete by remember { mutableStateOf<String?>(null) }
+    var clearKind by remember { mutableStateOf<String?>(null) }
+    var profileToSwitch by remember { mutableStateOf<Pair<String, String>?>(null) }
+
     // Banner message triggers snackbar
     LaunchedEffect(uiState.bannerMessage) {
         uiState.bannerMessage?.let { msg ->
             snackbarHostState.showSnackbar(msg)
-            viewModel.clearBanner()
+            mainViewModel.clearBanner()
+        }
+    }
+    LaunchedEffect(publishState.notice) {
+        publishState.notice?.let { msg ->
+            snackbarHostState.showSnackbar(msg)
+            publishViewModel.clearNotice()
         }
     }
 
-    val showBottomBar = uiState.currentDestination in listOf(
+    val mainDestinations = listOf(
         AppDestination.INBOX,
         AppDestination.TOPICS,
-        AppDestination.SAVED,
+        AppDestination.COMPOSE,
+        AppDestination.OUTBOX,
+        AppDestination.ACTIVITY,
         AppDestination.SETTINGS,
     )
+    val showBottomBar = uiState.currentDestination in mainDestinations
+    val activeProfileName = uiState.profiles
+        .firstOrNull { it.id == uiState.activeProfileId }
+        ?.displayName
+        ?.takeIf { it.isNotBlank() }
+        ?: uiState.serverConfig.serverUrl.ifBlank { "no profile" }
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
@@ -183,7 +218,7 @@ fun KaminariApp(
             if (showBottomBar) {
                 NftyBottomNavigationBar(
                     currentTab = uiState.selectedTab,
-                    onTabSelected = { viewModel.selectTab(it) },
+                    onTabSelected = { mainViewModel.selectTab(it) },
                 )
             }
         }
@@ -199,10 +234,10 @@ fun KaminariApp(
                     SetupScreen(
                         serverConfig = uiState.serverConfig,
                         authState = uiState.authState,
-                        onSaveConfig = { viewModel.saveConfig(it, connect = true) },
-                        onSaveAsNewProfile = { viewModel.addServerProfile(it) },
+                        onSaveConfig = { mainViewModel.saveConfig(it, connect = true) },
+                        onSaveAsNewProfile = { mainViewModel.addServerProfile(it) },
                         hasExistingProfile = uiState.activeProfileId != null,
-                        onTestConnection = { viewModel.testConnection(it) },
+                        onTestConnection = { mainViewModel.testConnection(it) },
                     )
                 }
 
@@ -217,19 +252,22 @@ fun KaminariApp(
                         isCompactDensity = uiState.isCompactDensity,
                         errorCategory = uiState.errorCategory,
                         customErrorMessage = uiState.customErrorMessage,
-                        onFilterChange = { viewModel.setFilter(it) },
-                        onClearTopicFilter = { viewModel.setTopicFilter(null) },
-                        onRetryStream = { viewModel.retryLiveStream() },
-                        onMessageClick = { viewModel.openMessageDetail(it) },
-                        onToggleSave = { viewModel.toggleSaveMessage(it) },
-                        onMarkAllRead = { viewModel.markAllAsRead() },
-                        onSearchClick = { viewModel.navigateTo(AppDestination.SEARCH) },
+                        searchQuery = uiState.searchQuery,
+                        onSearchQueryChange = { mainViewModel.setSearchQuery(it) },
+                        onFilterChange = { mainViewModel.setFilter(it) },
+                        onClearTopicFilter = { mainViewModel.setTopicFilter(null) },
+                        onRetryStream = { mainViewModel.retryLiveStream() },
+                        onRefresh = { mainViewModel.retryLiveStream() },
+                        onMessageClick = { mainViewModel.openMessageDetail(it) },
+                        onToggleSave = { mainViewModel.toggleSaveMessage(it) },
+                        onMarkAllRead = { mainViewModel.markAllAsRead() },
+                        onSearchClick = { mainViewModel.navigateTo(AppDestination.SEARCH) },
                         onToggleThemeClick = {
-                            viewModel.setThemeSetting(
+                            mainViewModel.setThemeSetting(
                                 if (isDarkTheme) ThemeSetting.DAY else ThemeSetting.NIGHT
                             )
                         },
-                        onSettingsClick = { viewModel.navigateTo(AppDestination.SETTINGS) },
+                        onSettingsClick = { mainViewModel.navigateTo(AppDestination.SETTINGS) },
                     )
                 }
 
@@ -237,13 +275,13 @@ fun KaminariApp(
                     uiState.selectedMessage?.let { message ->
                         NotificationDetailScreen(
                             message = message,
-                            onBackClick = { viewModel.navigateTo(uiState.selectedTab) },
-                            onToggleSave = { viewModel.toggleSaveMessage(it) },
-                            onDeleteMessage = { viewModel.deleteMessage(it) },
-                            onOpenUrl = { viewModel.promptExternalUrl(it) },
+                            onBackClick = { mainViewModel.navigateTo(uiState.selectedTab) },
+                            onToggleSave = { mainViewModel.toggleSaveMessage(it) },
+                            onDeleteMessage = { messageToDelete = it },
+                            onOpenUrl = { mainViewModel.promptExternalUrl(it) },
                         )
                     } ?: run {
-                        viewModel.navigateTo(AppDestination.INBOX)
+                        mainViewModel.navigateTo(AppDestination.INBOX)
                     }
                 }
 
@@ -252,47 +290,79 @@ fun KaminariApp(
                         topics = uiState.topics,
                         authState = uiState.authState,
                         isSampleData = uiState.isSampleData,
+                        errorCategory = uiState.errorCategory,
+                        customErrorMessage = uiState.customErrorMessage,
                         onTopicSelected = { topicName ->
-                            viewModel.setTopicFilter(topicName)
-                            viewModel.navigateTo(AppDestination.INBOX)
+                            mainViewModel.setTopicFilter(topicName)
+                            mainViewModel.navigateTo(AppDestination.INBOX)
                         },
-                        onToggleSubscription = { viewModel.toggleTopicSubscription(it) },
-                        onTogglePause = { viewModel.toggleTopicPause(it) },
-                        onAddTopic = { name, desc -> viewModel.addTopic(name, desc) },
-                        onSearchClick = { viewModel.navigateTo(AppDestination.SEARCH) },
+                        onToggleSubscription = { mainViewModel.toggleTopicSubscription(it) },
+                        onTogglePause = { mainViewModel.toggleTopicPause(it) },
+                        onAddTopic = { name, desc -> mainViewModel.addTopic(name, desc) },
+                        onRetryStream = { mainViewModel.retryLiveStream() },
+                        onSearchClick = { mainViewModel.navigateTo(AppDestination.SEARCH) },
                         onToggleThemeClick = {
-                            viewModel.setThemeSetting(
+                            mainViewModel.setThemeSetting(
                                 if (isDarkTheme) ThemeSetting.DAY else ThemeSetting.NIGHT
                             )
                         },
-                        onSettingsClick = { viewModel.navigateTo(AppDestination.SETTINGS) },
+                        onSettingsClick = { mainViewModel.navigateTo(AppDestination.SETTINGS) },
                     )
                 }
 
-                AppDestination.SAVED -> {
-                    val savedMessages = uiState.messages.filter { it.isSaved }
-                    SavedScreen(
-                        savedMessages = savedMessages,
+                AppDestination.COMPOSE -> {
+                    PublishScreen(
+                        state = publishState,
                         authState = uiState.authState,
+                        profileLabel = activeProfileName,
                         isSampleData = uiState.isSampleData,
-                        onMessageClick = { viewModel.openMessageDetail(it) },
-                        onToggleSave = { viewModel.toggleSaveMessage(it) },
-                        onSearchClick = { viewModel.navigateTo(AppDestination.SEARCH) },
-                        onToggleThemeClick = {
-                            viewModel.setThemeSetting(
-                                if (isDarkTheme) ThemeSetting.DAY else ThemeSetting.NIGHT
-                            )
-                        },
-                        onSettingsClick = { viewModel.navigateTo(AppDestination.SETTINGS) },
+                        onTopicChange = publishViewModel::setTopic,
+                        onTitleChange = publishViewModel::setTitle,
+                        onBodyChange = publishViewModel::setBody,
+                        onPriorityChange = publishViewModel::setPriority,
+                        onTagsChange = publishViewModel::setTags,
+                        onClickUrlChange = publishViewModel::setClickUrl,
+                        onAttachmentUrlChange = publishViewModel::setAttachmentUrl,
+                        onDelayChange = publishViewModel::setDelay,
+                        onToggleAdvanced = publishViewModel::toggleAdvanced,
+                        onSend = publishViewModel::send,
+                        onRetryLast = publishViewModel::retryLast,
+                        onDismissOutcome = publishViewModel::dismissOutcome,
+                        onClearValidation = publishViewModel::clearValidationError,
+                        onSettingsClick = { mainViewModel.navigateTo(AppDestination.SETTINGS) },
+                    )
+                }
+
+                AppDestination.OUTBOX -> {
+                    OutboxScreen(
+                        state = publishState,
+                        authState = uiState.authState,
+                        profileLabel = activeProfileName,
+                        isSampleData = uiState.isSampleData,
+                        onRetry = { publishViewModel.retryEntry(it) },
+                        onCancel = publishViewModel::cancelEntry,
+                        onClearNotice = publishViewModel::clearNotice,
+                        onSettingsClick = { mainViewModel.navigateTo(AppDestination.SETTINGS) },
+                    )
+                }
+
+                AppDestination.ACTIVITY -> {
+                    ActivityScreen(
+                        state = activityState,
+                        authState = uiState.authState,
+                        profileLabel = activeProfileName,
+                        isSampleData = uiState.isSampleData,
+                        onFilterChange = activityViewModel::setFilter,
+                        onSettingsClick = { mainViewModel.navigateTo(AppDestination.SETTINGS) },
                     )
                 }
 
                 AppDestination.SEARCH -> {
                     SearchScreen(
                         messages = uiState.messages,
-                        onBackClick = { viewModel.navigateTo(uiState.selectedTab) },
-                        onMessageClick = { viewModel.openMessageDetail(it) },
-                        onToggleSave = { viewModel.toggleSaveMessage(it) },
+                        onBackClick = { mainViewModel.navigateTo(uiState.selectedTab) },
+                        onMessageClick = { mainViewModel.openMessageDetail(it) },
+                        onToggleSave = { mainViewModel.toggleSaveMessage(it) },
                     )
                 }
 
@@ -310,25 +380,103 @@ fun KaminariApp(
                         sampleDataEnabled = uiState.sampleDataEnabled,
                         historyCount = uiState.messages.size,
                         malformedLines = uiState.malformedLines,
-                        onThemeChange = { viewModel.setThemeSetting(it) },
-                        onToggleDensity = { viewModel.toggleDensity() },
-                        onTestConnection = { viewModel.testConnection(uiState.serverConfig) },
-                        onSelectProfile = { viewModel.switchProfile(it) },
-                        onCatchUp = { viewModel.retryLiveStream() },
-                        onNavigateToSetup = { viewModel.navigateTo(AppDestination.SETUP) },
-                        onClearHistory = { viewModel.clearHistory() },
-                        onClearSaved = { viewModel.clearSaved() },
-                        onToggleSampleData = { viewModel.setSampleDataEnabled(it) },
+                        profileEdit = uiState.profileEdit,
+                        profileEditError = uiState.profileEditError,
+                        onThemeChange = { mainViewModel.setThemeSetting(it) },
+                        onToggleDensity = { mainViewModel.toggleDensity() },
+                        onTestConnection = { mainViewModel.testActiveConnection() },
+                        onSelectProfile = { profileId ->
+                            val profile = uiState.profiles.firstOrNull { it.id == profileId }
+                            if (profile != null) {
+                                profileToSwitch = profile.id to profile.displayName
+                            }
+                        },
+                        onEditProfile = { mainViewModel.startProfileEdit(it) },
+                        onAddProfile = { mainViewModel.addServerProfile(it) },
+                        onCancelProfileEdit = { mainViewModel.cancelProfileEdit() },
+                        onSaveProfileEdit = { url, auth, username, secret, https ->
+                            mainViewModel.saveProfileEdit(url, auth, username, secret, https)
+                        },
+                        onCatchUp = { mainViewModel.retryLiveStream() },
+                        onClearHistory = { clearKind = "history" },
+                        onClearSaved = { clearKind = "saved" },
+                        onToggleSampleData = { mainViewModel.setSampleDataEnabled(it) },
                         deliveryMode = uiState.deliveryMode,
                         deliveryStatus = uiState.deliveryStatus,
                         notificationsEnabled = notificationsEnabled,
-                        onSelectDeliveryMode = { viewModel.setDeliveryMode(it) },
+                        onSelectDeliveryMode = { mainViewModel.setDeliveryMode(it) },
                         onOpenNotificationSettings = onOpenNotificationSettings,
-                        onSearchClick = { viewModel.navigateTo(AppDestination.SEARCH) },
+                        onSearchClick = { mainViewModel.navigateTo(AppDestination.SEARCH) },
                     )
                 }
             }
         }
+    }
+
+    // Destructive message actions always require confirmation.
+    messageToDelete?.let { id ->
+        NftyConfirmationSheet(
+            title = "Delete notification?",
+            message = "This removes the message from local history on this device. Saved messages are also removed.",
+            confirmLabel = "Delete",
+            isDestructive = true,
+            onConfirm = {
+                mainViewModel.deleteMessage(id)
+                messageToDelete = null
+            },
+            onDismiss = { messageToDelete = null },
+        )
+    }
+
+    clearKind?.let { kind ->
+        NftyConfirmationSheet(
+            title = if (kind == "history") "Clear local history?" else "Remove all saved items?",
+            message = if (kind == "history") {
+                "Unsaved notifications are removed for this profile. Saved items are preserved."
+            } else {
+                "Every saved flag is cleared for this profile. Messages themselves stay in history."
+            },
+            confirmLabel = if (kind == "history") "Clear History" else "Clear Saved",
+            isDestructive = true,
+            onConfirm = {
+                if (kind == "history") mainViewModel.clearHistory() else mainViewModel.clearSaved()
+                clearKind = null
+            },
+            onDismiss = { clearKind = null },
+        )
+    }
+
+    profileToSwitch?.let { (id, name) ->
+        NftyConfirmationSheet(
+            title = "Switch to $name?",
+            message = "The current profile's messages, topics, outbox and credentials stay on this device. The active connection will restart for the selected profile.",
+            confirmLabel = "Switch Profile",
+            onConfirm = {
+                mainViewModel.switchProfile(id)
+                profileToSwitch = null
+            },
+            onDismiss = { profileToSwitch = null },
+        )
+    }
+
+    if (publishState.pendingAmbiguousRetry != null) {
+        NftyConfirmationSheet(
+            title = "Retry ambiguous publish?",
+            message = "The previous attempt may already have been accepted. Retrying can publish the same message twice. Only continue if a duplicate is acceptable.",
+            confirmLabel = "Retry Anyway",
+            isDestructive = true,
+            onConfirm = { publishViewModel.confirmAmbiguousRetry() },
+            onDismiss = { publishViewModel.dismissAmbiguousRetry() },
+        )
+    }
+
+    uiState.profileChangePreview?.let { preview ->
+        ProfileChangePreviewDialog(
+            preview = preview,
+            onDismiss = { mainViewModel.dismissProfileChangePreview() },
+            onCreateNew = { mainViewModel.confirmProfileChange(createNew = true) },
+            onKeepAndMix = { mainViewModel.confirmProfileChange(createNew = false) },
+        )
     }
 
     // External URL Confirmation Dialog (Field manual security requirement)
@@ -339,15 +487,15 @@ fun KaminariApp(
             actionUrl = url,
             confirmLabel = "Open Browser",
             onConfirm = {
-                viewModel.dismissUrlPrompt()
+                mainViewModel.dismissUrlPrompt()
                 try {
                     val browserIntent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
                     context.startActivity(browserIntent)
-                } catch (e: Exception) {
-                    // Silently ignore or show error
+                } catch (_: Exception) {
+                    // The platform reports a missing browser; nothing else to do.
                 }
             },
-            onDismiss = { viewModel.dismissUrlPrompt() }
+            onDismiss = { mainViewModel.dismissUrlPrompt() },
         )
     }
 }

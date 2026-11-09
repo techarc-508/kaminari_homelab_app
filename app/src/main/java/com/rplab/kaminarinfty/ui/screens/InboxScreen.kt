@@ -22,6 +22,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DoneAll
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.WifiOff
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -44,6 +45,7 @@ import com.rplab.kaminarinfty.ui.components.NftyEmptyState
 import com.rplab.kaminarinfty.ui.components.NftyErrorState
 import com.rplab.kaminarinfty.ui.components.NftyLoadingIndicator
 import com.rplab.kaminarinfty.ui.components.NftyNotificationRow
+import com.rplab.kaminarinfty.ui.components.NftySearchField
 import com.rplab.kaminarinfty.ui.components.NftyTopBar
 import com.rplab.kaminarinfty.ui.theme.KaminariTheme
 import com.rplab.kaminarinfty.ui.theme.RubikFontFamily
@@ -59,9 +61,12 @@ fun InboxScreen(
     isCompactDensity: Boolean = false,
     errorCategory: NftyErrorCategory = NftyErrorCategory.UNREACHABLE,
     customErrorMessage: String? = null,
+    searchQuery: String = "",
+    onSearchQueryChange: (String) -> Unit = {},
     onFilterChange: (InboxFilter) -> Unit,
     onClearTopicFilter: () -> Unit,
     onRetryStream: (() -> Unit)? = null,
+    onRefresh: () -> Unit = {},
     onMessageClick: (NftyMessage) -> Unit,
     onToggleSave: (String) -> Unit,
     onMarkAllRead: () -> Unit,
@@ -78,10 +83,17 @@ fun InboxScreen(
         val matchesFilter = when (activeFilter) {
             InboxFilter.ALL -> true
             InboxFilter.UNREAD -> !msg.isRead
+            InboxFilter.SAVED -> msg.isSaved
             InboxFilter.HIGH_URGENT -> msg.priority == NftyPriority.HIGH || msg.priority == NftyPriority.URGENT
             InboxFilter.TODAY -> (now - msg.time) < day
         }
-        matchesTopic && matchesFilter
+        val query = searchQuery.trim()
+        val matchesQuery = query.isBlank() ||
+            msg.title?.contains(query, ignoreCase = true) == true ||
+            msg.message.contains(query, ignoreCase = true) ||
+            msg.topic.contains(query, ignoreCase = true) ||
+            msg.tags.any { it.contains(query, ignoreCase = true) }
+        matchesTopic && matchesFilter && matchesQuery
     }
 
     val todayMessages = filteredMessages.filter { (now - it.time) < day }
@@ -104,6 +116,18 @@ fun InboxScreen(
             onToggleThemeClick = onToggleThemeClick,
             onSettingsClick = onSettingsClick,
         )
+
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 14.dp, vertical = 6.dp)
+        ) {
+            NftySearchField(
+                query = searchQuery,
+                onQueryChange = onSearchQueryChange,
+                placeholder = "Search title, message, topic or tag…",
+            )
+        }
 
         // Live metrics only — every value is derived from real app state.
         Row(
@@ -180,6 +204,23 @@ fun InboxScreen(
             }
 
             Spacer(modifier = Modifier.weight(1f))
+
+            IconButton(
+                onClick = onRefresh,
+                modifier = Modifier
+                    .size(30.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(KaminariTheme.colors.surfaceSecondary)
+                    .border(0.75.dp, KaminariTheme.colors.border.copy(alpha = 0.6f), RoundedCornerShape(8.dp))
+                    .testTag("inbox_refresh_button")
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Refresh,
+                    contentDescription = "Refresh live stream and missed history",
+                    tint = KaminariTheme.colors.textSecondary,
+                    modifier = Modifier.size(15.dp),
+                )
+            }
 
             Box(
                 modifier = Modifier
@@ -335,10 +376,21 @@ fun InboxScreen(
                     contentAlignment = Alignment.Center,
                 ) {
                     NftyEmptyState(
-                        title = "No matching notifications",
-                        message = "Try selecting a different filter above or clear your topic selection.",
+                        title = if (searchQuery.isBlank()) {
+                            "No matching notifications"
+                        } else {
+                            "No search results"
+                        },
+                        message = if (searchQuery.isBlank()) {
+                            "Try selecting a different filter above or clear your topic selection."
+                        } else {
+                            "No cached notification matches \"$searchQuery\". Try a broader search or another filter."
+                        },
                         actionLabel = "Show All Notifications",
-                        onActionClick = { onFilterChange(InboxFilter.ALL) },
+                        onActionClick = {
+                            onFilterChange(InboxFilter.ALL)
+                            onSearchQueryChange("")
+                        },
                     )
                 }
             }

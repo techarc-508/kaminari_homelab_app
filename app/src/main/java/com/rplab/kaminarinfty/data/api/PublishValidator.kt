@@ -12,6 +12,31 @@ object PublishValidator {
 
     /** Returns a human-readable reason for the first failure, or null when valid. */
     fun validate(config: ServerConfig, request: PublishRequest): String? {
+        validateRequest(request)?.let { return it }
+        if (config.serverUrl.isBlank()) return "Server URL is required"
+
+        // A method that needs a secret must have one before we touch the network.
+        when (config.authMethod) {
+            AuthMethod.GUEST -> Unit
+            AuthMethod.USERNAME_PASSWORD -> {
+                if (config.username.isBlank() || config.tokenOrPassword.isBlank()) {
+                    return "Username and password are required for basic authentication"
+                }
+            }
+            AuthMethod.ACCESS_TOKEN -> {
+                if (config.tokenOrPassword.isBlank()) {
+                    return "An access token is required for bearer authentication"
+                }
+            }
+        }
+        return null
+    }
+
+    /**
+     * Validates only the request fields. The compose form uses this before an
+     * enqueue so validation feedback appears without reading any credential.
+     */
+    fun validateRequest(request: PublishRequest): String? {
         if (!NtfyEndpoint.isValidTopic(request.topic)) {
             return "Invalid topic \"${request.topic}\": use 1-64 letters, digits, '-' or '_'"
         }
@@ -32,22 +57,6 @@ object PublishValidator {
         }
         request.delay?.let { value ->
             if (!isValidDelay(value)) return "Invalid delay \"$value\": use a duration like 30m or a Unix timestamp"
-        }
-        if (config.serverUrl.isBlank()) return "Server URL is required"
-
-        // A method that needs a secret must have one before we touch the network.
-        when (config.authMethod) {
-            AuthMethod.GUEST -> Unit
-            AuthMethod.USERNAME_PASSWORD -> {
-                if (config.username.isBlank() || config.tokenOrPassword.isBlank()) {
-                    return "Username and password are required for basic authentication"
-                }
-            }
-            AuthMethod.ACCESS_TOKEN -> {
-                if (config.tokenOrPassword.isBlank()) {
-                    return "An access token is required for bearer authentication"
-                }
-            }
         }
         return null
     }

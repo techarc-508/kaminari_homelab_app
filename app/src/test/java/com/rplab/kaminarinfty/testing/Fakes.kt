@@ -1,23 +1,33 @@
 package com.rplab.kaminarinfty.testing
 
+import com.rplab.kaminarinfty.data.api.PublishRequest
 import com.rplab.kaminarinfty.data.preferences.AppPreferences
 import com.rplab.kaminarinfty.data.preferences.AppPreferencesData
+import com.rplab.kaminarinfty.data.repository.ActivityRepository
 import com.rplab.kaminarinfty.data.repository.CatchUpOutcome
 import com.rplab.kaminarinfty.data.repository.MessageRepository
+import com.rplab.kaminarinfty.data.repository.OutboxRepository
 import com.rplab.kaminarinfty.data.repository.ProfileRepository
 import com.rplab.kaminarinfty.data.repository.ProfileSaveResult
+import com.rplab.kaminarinfty.data.repository.SendOutcome
 import com.rplab.kaminarinfty.data.repository.StreamRepository
 import com.rplab.kaminarinfty.delivery.DeliveryController
 import com.rplab.kaminarinfty.ThemeSetting
+import com.rplab.kaminarinfty.model.ActivityEvent
+import com.rplab.kaminarinfty.model.ActivitySeverity
+import com.rplab.kaminarinfty.model.ActivityType
 import com.rplab.kaminarinfty.model.AuthMethod
 import com.rplab.kaminarinfty.model.DeliveryMode
 import com.rplab.kaminarinfty.model.AuthState
 import com.rplab.kaminarinfty.model.NftyErrorCategory
 import com.rplab.kaminarinfty.model.NftyMessage
 import com.rplab.kaminarinfty.model.NftyTopic
+import com.rplab.kaminarinfty.model.OutboxEntry
+import com.rplab.kaminarinfty.model.OutboxState
 import com.rplab.kaminarinfty.model.ServerConfig
 import com.rplab.kaminarinfty.model.ServerProfile
 import com.rplab.kaminarinfty.model.StreamUpdate
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -132,6 +142,8 @@ class FakeProfileRepository : ProfileRepository {
     val addedTopics = mutableListOf<String>()
     var subscribedNames: List<String> = emptyList()
     var activeId: String? = null
+    val activeFlow = MutableStateFlow<String?>(null)
+    val updatedProfiles = mutableListOf<Pair<String, ServerConfig>>()
     var onSetActive: (String) -> Unit = {}
 
     /** Simulates an unavailable Keystore when non-null. */
@@ -139,7 +151,7 @@ class FakeProfileRepository : ProfileRepository {
 
     override fun observeProfiles(): Flow<List<ServerProfile>> = profilesFlow
 
-    override fun observeActiveProfileId(): Flow<String?> = MutableStateFlow(activeId)
+    override fun observeActiveProfileId(): Flow<String?> = activeFlow
 
     override fun observeTopics(profileId: String): Flow<List<NftyTopic>> = topicsFlow
 
@@ -190,6 +202,7 @@ class FakeProfileRepository : ProfileRepository {
 
     override suspend fun updateProfile(profileId: String, config: ServerConfig): ProfileSaveResult {
         this.config = config
+        updatedProfiles += profileId to config
         return ProfileSaveResult(
             profileId = profileId,
             credentialStored = credentialError == null,
@@ -199,6 +212,7 @@ class FakeProfileRepository : ProfileRepository {
 
     override suspend fun setActiveProfileId(id: String) {
         activeId = id
+        activeFlow.value = id
         onSetActive(id)
     }
 
@@ -279,6 +293,151 @@ class FakeStreamRepository : StreamRepository {
     }
 
     override fun close() = Unit
+}
+
+class FakeOutboxRepository : OutboxRepository {
+    val entries = MutableStateFlow<List<OutboxEntry>>(emptyList())
+    val sendOutcomes = ArrayDeque<SendOutcome>()
+    val retryOutcomes = ArrayDeque<SendOutcome>()
+    val sendCalls = mutableListOf<String>()
+    val retryCalls = mutableListOf<Triple<String, String, Boolean>>()
+    val cancelled = mutableListOf<String>()
+    var enqueueResult: Result<String>? = null
+    var lastRequest: PublishRequest? = null
+    var sendGate: CompletableDeferred<Unit>? = null
+    private var nextId = 1
+
+    override fun observe(profileId: String, limit: Int): Flow<List<OutboxEntry>> = entries
+
+    override suspend fun count(profileId: String): Int = entries.value.size
+
+    override suspend fun enqueue(profileId: String, request: PublishRequest): Result<String> {
+        lastRequest = request
+        enqueueResult?.let { return it }
+        val clientId = "client-${nextId++}"
+        entries.update { current ->
+            current + OutboxEntry(
+                clientId = clientId,
+                profileId = profileId,
+                topic = request.topic,
+                title = request.title,
+                body = request.message,
+                priority = request.priority,
+                tags = request.tags,
+                clickUrl = request.clickUrl,
+                attachmentUrl = request.attachUrl,
+                delay = request.delay,
+                state = OutboxState.QUEUED,
+                attemptCount = 0,
+                retryable = false,
+                lastError = null,
+                serverMessageId = null,
+                createdAt = 0L,
+                updatedAt = 0L,
+                acceptedAt = null,
+            )
+        }
+        return Result.success(clientId)
+    }
+
+    override suspend fun send(profileId: String, clientId: String): SendOutcome {
+        sendCalls += clientId
+        sendGate?.await()
+        val outcome = sendOutcomes.removeFirstOrNull() ?: SendOutcome.Accepted("server-1")
+        applyOutcome(clientId, outcome)
+        return outcome
+    }
+
+    override suspend fun retry(
+        profileId: String,
+        clientId: String,
+        allowAmbiguous: Boolean,
+    ): SendOutcome {
+        retryCalls += Triple(profileId, clientId, allowAmbiguous)
+        val outcome = retryOutcomes.removeFirstOrNull() ?: SendOutcome.Accepted("server-retry")
+        applyOutcome(clientId, outcome)
+        return outcome
+    }
+
+    override suspend fun cancel(profileId: String, clientId: String): Boolean {
+        val entry = entries.value.firstOrNull { it.clientId == clientId } ?: return false
+        if (entry.state !in listOf(OutboxState.QUEUED, OutboxState.FAILED, OutboxState.AMBIGUOUS)) {
+            return false
+        }
+        cancelled += clientId
+        entries.update { current -> current.filterNot { it.clientId == clientId } }
+        return true
+    }
+
+    override suspend fun recoverStuck(profileId: String): Int = 0
+
+    override suspend fun prune(profileId: String) = Unit
+
+    private fun applyOutcome(clientId: String, outcome: SendOutcome) {
+        val state = when (outcome) {
+            is SendOutcome.Accepted -> OutboxState.ACCEPTED
+            is SendOutcome.Failed -> OutboxState.FAILED
+            is SendOutcome.Ambiguous -> OutboxState.AMBIGUOUS
+            SendOutcome.Busy, SendOutcome.NotFound, is SendOutcome.ConfirmationRequired ->
+                return
+        }
+        entries.update { current ->
+            current.map { entry ->
+                if (entry.clientId != clientId) entry
+                else entry.copy(
+                    state = state,
+                    attemptCount = entry.attemptCount + 1,
+                    retryable = (outcome as? SendOutcome.Failed)?.retryable ?: false,
+                    lastError = when (outcome) {
+                        is SendOutcome.Failed -> outcome.reason
+                        is SendOutcome.Ambiguous -> outcome.reason
+                        else -> null
+                    },
+                )
+            }
+        }
+    }
+}
+
+class FakeActivityRepository : ActivityRepository {
+    val events = MutableStateFlow<List<ActivityEvent>>(emptyList())
+    val observedProfiles = mutableListOf<String>()
+    var pruneCalls = 0
+
+    override fun observe(profileId: String, limit: Int): Flow<List<ActivityEvent>> {
+        observedProfiles += profileId
+        return events
+    }
+
+    override suspend fun record(
+        profileId: String,
+        type: ActivityType,
+        severity: ActivitySeverity,
+        summary: String,
+        correlationId: String?,
+        messageId: String?,
+        topic: String?,
+        eventId: String?,
+    ): Boolean {
+        events.update {
+            it + ActivityEvent(
+                id = eventId ?: "event-${it.size + 1}",
+                profileId = profileId,
+                type = type,
+                severity = severity,
+                summary = summary,
+                correlationId = correlationId,
+                messageId = messageId,
+                topic = topic,
+                createdAt = 0L,
+            )
+        }
+        return true
+    }
+
+    override suspend fun prune(profileId: String) {
+        pruneCalls++
+    }
 }
 
 class FakeDeliveryController : DeliveryController {

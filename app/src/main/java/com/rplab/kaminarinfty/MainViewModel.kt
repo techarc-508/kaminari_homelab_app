@@ -7,11 +7,13 @@ import com.rplab.kaminarinfty.data.SampleDataProvider
 import com.rplab.kaminarinfty.data.api.NtfyEndpoint
 import com.rplab.kaminarinfty.data.preferences.AppPreferences
 import com.rplab.kaminarinfty.data.repository.MessageRepository
+import com.rplab.kaminarinfty.data.repository.OutboxRepository
 import com.rplab.kaminarinfty.data.repository.ProfileRepository
 import com.rplab.kaminarinfty.data.repository.StreamRepository
 import com.rplab.kaminarinfty.delivery.DeliveryController
 import com.rplab.kaminarinfty.delivery.DeliveryStatus
 import com.rplab.kaminarinfty.delivery.DeliveryStatusStore
+import com.rplab.kaminarinfty.model.AuthMethod
 import com.rplab.kaminarinfty.model.AuthState
 import com.rplab.kaminarinfty.model.DeliveryMode
 import com.rplab.kaminarinfty.model.NftyErrorCategory
@@ -37,7 +39,9 @@ enum class AppDestination {
     INBOX,
     DETAIL,
     TOPICS,
-    SAVED,
+    COMPOSE,
+    OUTBOX,
+    ACTIVITY,
     SETTINGS,
     SEARCH,
 }
@@ -45,9 +49,22 @@ enum class AppDestination {
 enum class InboxFilter(val label: String) {
     ALL("All"),
     UNREAD("Unread"),
+    SAVED("Saved"),
     HIGH_URGENT("Urgent & High"),
     TODAY("Today"),
 }
+
+/** Editable, non-secret profile fields. The stored credential never enters UI state. */
+data class ProfileEditUi(
+    val profileId: String,
+    val displayName: String,
+    val originalUrl: String,
+    val serverUrl: String,
+    val authMethod: AuthMethod,
+    val username: String,
+    val useHttpsOnly: Boolean,
+    val hasStoredSecret: Boolean,
+)
 
 enum class ThemeSetting(val label: String) {
     SYSTEM("Follow System"),
@@ -83,6 +100,18 @@ data class MainUiState(
     val deliveryMode: DeliveryMode = DeliveryMode.DEFAULT,
     /** Service-owned state while Instant mode is selected. */
     val deliveryStatus: DeliveryStatus = DeliveryStatus(),
+    val isSwitchingProfile: Boolean = false,
+    val profileEdit: ProfileEditUi? = null,
+    val profileEditError: String? = null,
+    /** Counts only; the pending URL/token stays private until confirmation. */
+    val profileChangePreview: ProfileChangePreview? = null,
+)
+
+data class ProfileChangePreview(
+    val destinationUrl: String,
+    val messages: Int,
+    val topics: Int,
+    val outbox: Int,
 )
 
 class MainViewModel(
@@ -92,6 +121,7 @@ class MainViewModel(
     private val streamRepository: StreamRepository,
     private val deliveryController: DeliveryController,
     private val deliveryStatusStore: DeliveryStatusStore = DeliveryStatusStore(),
+    private val outboxRepository: OutboxRepository? = null,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(MainUiState())
@@ -108,6 +138,8 @@ class MainViewModel(
     private var newestStoredTime: Long = 0L
     private var lastAppliedDeliveryMode: DeliveryMode? = null
     private var lastStatusNoticeSequence: Long = 0L
+    private var reapplyModeAfterSwitch = false
+    private var pendingProfileConfig: ServerConfig? = null
 
     init {
         deliveryController.ensureNotificationChannels()
@@ -270,6 +302,10 @@ class MainViewModel(
                     currentDestination = AppDestination.SETUP,
                     lastCursor = null,
                     isSyncing = false,
+                    isSwitchingProfile = false,
+                    messages = emptyList(),
+                    topics = emptyList(),
+                    selectedMessage = null,
                 )
             }
             refreshDisplayedData()
@@ -277,17 +313,34 @@ class MainViewModel(
         }
 
         profileJob = viewModelScope.launch {
-            val config = profileRepository.loadConfig(profileId) ?: return@launch
+            val config = profileRepository.loadConfig(profileId)
+            if (config == null) {
+                _uiState.update {
+                    it.copy(
+                        isSwitchingProfile = false,
+                        authState = AuthState.NOT_CONFIGURED,
+                        bannerMessage = "The selected server profile is no longer available",
+                    )
+                }
+                return@launch
+            }
             _uiState.update {
                 it.copy(
-                    serverConfig = config,
+                    serverConfig = config.withoutSecret(),
                     activeProfileId = profileId,
+                    isSwitchingProfile = false,
                     currentDestination = if (it.currentDestination == AppDestination.SETUP) {
                         AppDestination.INBOX
                     } else {
                         it.currentDestination
                     },
                 )
+            }
+            if (reapplyModeAfterSwitch) {
+                reapplyModeAfterSwitch = false
+                if (_uiState.value.deliveryMode == DeliveryMode.BATTERY_SAVER) {
+                    deliveryController.scheduleBatterySaver()
+                }
             }
             launch {
                 messageRepository.observe(profileId).collect { rows ->
@@ -381,7 +434,9 @@ class MainViewModel(
         val samples = sampleDataEnabled
         if (samples && sampleMessages.isEmpty()) sampleMessages = SampleDataProvider.getSampleMessages()
         val messages = if (samples) sampleMessages else dbMessages
-        val topics = if (samples) SampleDataProvider.getSampleTopics() else dbTopics
+        val rawTopics = if (samples) SampleDataProvider.getSampleTopics() else dbTopics
+        val counts = messages.groupingBy { it.topic }.eachCount()
+        val topics = rawTopics.map { topic -> topic.copy(messageCount = counts[topic.name] ?: 0) }
         _uiState.update { current ->
             current.copy(
                 messages = messages,
@@ -417,22 +472,18 @@ class MainViewModel(
                 }
                 return@launch
             }
-            profileRepository.setActiveProfileId(result.profileId)
+            prepareProfileSwitch()
             activeProfileId = result.profileId
-            newestStoredTime = 0L
-            activeTopics = emptyList()
+            profileRepository.setActiveProfileId(result.profileId)
             _uiState.update {
                 it.copy(
-                    serverConfig = config,
-                    activeProfileId = result.profileId,
+                    serverConfig = config.withoutSecret(),
                     customErrorMessage = null,
                     bannerMessage = if (connect) "Profile saved — connecting" else "Profile saved",
                     currentDestination = if (connect) AppDestination.INBOX else it.currentDestination,
                 )
             }
-            if (connect) {
-                syncLiveStream(config, force = true)
-            }
+            bindProfile(result.profileId)
         }
     }
 
@@ -455,29 +506,264 @@ class MainViewModel(
                 }
                 return@launch
             }
-            profileRepository.setActiveProfileId(result.profileId)
+            prepareProfileSwitch()
             activeProfileId = result.profileId
-            activeTopics = emptyList()
-            newestStoredTime = 0L
+            profileRepository.setActiveProfileId(result.profileId)
             _uiState.update {
                 it.copy(
-                    serverConfig = config,
-                    activeProfileId = result.profileId,
+                    serverConfig = config.withoutSecret(),
                     customErrorMessage = null,
                     currentDestination = AppDestination.INBOX,
                     bannerMessage = "New server profile added",
                 )
             }
+            bindProfile(result.profileId)
         }
     }
 
+    /**
+     * Safe switch: stop the old transport and background engine, clear the
+     * in-memory window (never the database), then bind the new profile and
+     * re-apply its saved delivery mode.
+     */
     fun switchProfile(profileId: String) {
+        if (profileId.isBlank() || profileId == activeProfileId) return
         viewModelScope.launch {
-            if (profileId == activeProfileId) return@launch
-            activeTopics = emptyList()
-            newestStoredTime = 0L
+            val config = profileRepository.loadConfig(profileId)
+            if (config == null) {
+                _uiState.update {
+                    it.copy(bannerMessage = "Cannot switch — that server profile is no longer available")
+                }
+                return@launch
+            }
+            prepareProfileSwitch()
+            activeProfileId = profileId
             profileRepository.setActiveProfileId(profileId)
-            _uiState.update { it.copy(bannerMessage = "Switching server profile") }
+            _uiState.update {
+                it.copy(
+                    serverConfig = config.withoutSecret(),
+                    activeProfileId = profileId,
+                    bannerMessage = "Switching to ${config.serverUrl}",
+                )
+            }
+            bindProfile(profileId)
+        }
+    }
+
+    private fun prepareProfileSwitch() {
+        profileJob?.cancel()
+        activeTopics = emptyList()
+        newestStoredTime = 0L
+        reapplyModeAfterSwitch = true
+        streamRepository.stopSubscription()
+        deliveryController.stopInstant()
+        deliveryController.cancelBatterySaver()
+        dbMessages = emptyList()
+        dbTopics = emptyList()
+        _uiState.update {
+            it.copy(
+                messages = emptyList(),
+                topics = emptyList(),
+                selectedMessage = null,
+                activeFilter = InboxFilter.ALL,
+                selectedTopicFilter = null,
+                searchQuery = "",
+                lastCursor = null,
+                isSyncing = false,
+                isSwitchingProfile = true,
+            )
+        }
+    }
+
+    // ---- Profile editing and URL-change preview -----------------------------
+
+    fun startProfileEdit(profileId: String) {
+        viewModelScope.launch {
+            val config = profileRepository.loadConfig(profileId) ?: return@launch
+            val profile = _uiState.value.profiles.firstOrNull { it.id == profileId }
+            _uiState.update {
+                it.copy(
+                    profileEdit = ProfileEditUi(
+                        profileId = profileId,
+                        displayName = profile?.displayName ?: "Server profile",
+                        originalUrl = config.serverUrl,
+                        serverUrl = config.serverUrl,
+                        authMethod = config.authMethod,
+                        username = config.username,
+                        useHttpsOnly = config.useHttpsOnly,
+                        hasStoredSecret = profile?.hasStoredSecret == true,
+                    ),
+                    profileEditError = null,
+                )
+            }
+        }
+    }
+
+    fun cancelProfileEdit() {
+        pendingProfileConfig = null
+        _uiState.update { it.copy(profileEdit = null, profileEditError = null, profileChangePreview = null) }
+    }
+
+    fun saveProfileEdit(
+        serverUrl: String,
+        authMethod: AuthMethod,
+        username: String,
+        newSecret: String,
+        useHttpsOnly: Boolean,
+    ) {
+        val edit = _uiState.value.profileEdit ?: return
+        val normalized = NtfyEndpoint.normalizeBaseUrl(serverUrl, useHttpsOnly).getOrElse { failure ->
+            _uiState.update { it.copy(profileEditError = failure.message ?: "Invalid server URL") }
+            return
+        }
+        if (authMethod != AuthMethod.GUEST &&
+            newSecret.isBlank() &&
+            !(edit.hasStoredSecret && authMethod == edit.authMethod)
+        ) {
+            _uiState.update {
+                it.copy(profileEditError = "Enter a credential for ${authMethod.displayName}")
+            }
+            return
+        }
+        if (authMethod == AuthMethod.USERNAME_PASSWORD && username.isBlank()) {
+            _uiState.update { it.copy(profileEditError = "Username is required") }
+            return
+        }
+        val config = ServerConfig(
+            serverUrl = normalized,
+            authMethod = authMethod,
+            username = username.trim(),
+            tokenOrPassword = newSecret.trim(),
+            useHttpsOnly = useHttpsOnly,
+        )
+        pendingProfileConfig = config
+        val originalNormalized = NtfyEndpoint.normalizeBaseUrl(edit.originalUrl, edit.useHttpsOnly)
+            .getOrNull()
+            ?: edit.originalUrl
+        if (normalized != originalNormalized) {
+            viewModelScope.launch {
+                val preview = ProfileChangePreview(
+                    destinationUrl = normalized,
+                    messages = messageRepository.count(edit.profileId),
+                    topics = profileRepository.observeTopics(edit.profileId).first().size,
+                    outbox = outboxRepository?.count(edit.profileId) ?: 0,
+                )
+                _uiState.update {
+                    it.copy(profileChangePreview = preview, profileEditError = null)
+                }
+            }
+        } else {
+            applyProfileUpdate(edit.profileId, config)
+        }
+    }
+
+    fun dismissProfileChangePreview() {
+        pendingProfileConfig = null
+        _uiState.update { it.copy(profileChangePreview = null) }
+    }
+
+    /**
+     * Confirms a URL change. `createNew` is the recommended path so server data
+     * can never be mixed under one profile ID.
+     */
+    fun confirmProfileChange(createNew: Boolean) {
+        val config = pendingProfileConfig ?: return
+        val edit = _uiState.value.profileEdit ?: return
+        if (createNew) {
+            // A blank field means "keep the existing secret", which only works for
+            // in-place updates. A new profile must never inherit a credential for a
+            // different server URL silently.
+            if (config.authMethod != AuthMethod.GUEST && config.tokenOrPassword.isBlank()) {
+                pendingProfileConfig = null
+                _uiState.update {
+                    it.copy(
+                        profileChangePreview = null,
+                        profileEditError =
+                            "Enter the credential again to create a separate profile for the new URL",
+                    )
+                }
+                return
+            }
+            viewModelScope.launch {
+                val result = profileRepository.createProfile(config)
+                if (result.credentialError != null) {
+                    _uiState.update {
+                        it.copy(profileEditError = result.credentialError)
+                    }
+                    return@launch
+                }
+                prepareProfileSwitch()
+                activeProfileId = result.profileId
+                profileRepository.setActiveProfileId(result.profileId)
+                pendingProfileConfig = null
+                _uiState.update {
+                    it.copy(
+                        serverConfig = config.withoutSecret(),
+                        activeProfileId = result.profileId,
+                        profileEdit = null,
+                        profileEditError = null,
+                        profileChangePreview = null,
+                        currentDestination = AppDestination.INBOX,
+                        bannerMessage = "New profile created for the changed server URL",
+                    )
+                }
+                bindProfile(result.profileId)
+            }
+        } else {
+            applyProfileUpdate(edit.profileId, config)
+        }
+    }
+
+    private fun applyProfileUpdate(profileId: String, config: ServerConfig) {
+        viewModelScope.launch {
+            val result = profileRepository.updateProfile(profileId, config)
+            if (result.credentialError != null) {
+                _uiState.update { it.copy(profileEditError = result.credentialError) }
+                return@launch
+            }
+            pendingProfileConfig = null
+            _uiState.update {
+                it.copy(
+                    profileEdit = null,
+                    profileEditError = null,
+                    profileChangePreview = null,
+                    serverConfig = config.withoutSecret(),
+                    bannerMessage = "Server profile updated — existing local data was kept",
+                )
+            }
+            if (profileId == activeProfileId) {
+                val reloaded = profileRepository.loadConfig(profileId)
+                if (reloaded != null) {
+                    _uiState.update { it.copy(serverConfig = reloaded.withoutSecret()) }
+                    syncLiveStream(reloaded, force = true)
+                }
+            }
+        }
+    }
+
+    fun addProfile(
+        serverUrl: String,
+        authMethod: AuthMethod,
+        username: String,
+        secret: String,
+        useHttpsOnly: Boolean,
+    ) {
+        addServerProfile(
+            ServerConfig(
+                serverUrl = serverUrl.trim(),
+                authMethod = authMethod,
+                username = username.trim(),
+                tokenOrPassword = secret.trim(),
+                useHttpsOnly = useHttpsOnly,
+            )
+        )
+    }
+
+    fun testActiveConnection() {
+        viewModelScope.launch {
+            val profileId = activeProfileId ?: return@launch
+            val config = profileRepository.loadConfig(profileId) ?: return@launch
+            testConnection(config)
         }
     }
 
@@ -634,7 +920,9 @@ class MainViewModel(
             val newTab = when (destination) {
                 AppDestination.INBOX,
                 AppDestination.TOPICS,
-                AppDestination.SAVED,
+                AppDestination.COMPOSE,
+                AppDestination.OUTBOX,
+                AppDestination.ACTIVITY,
                 AppDestination.SETTINGS,
                 -> destination
                 else -> current.selectedTab
@@ -745,7 +1033,7 @@ class MainViewModel(
     // ---- Filters / search ---------------------------------------------------
 
     fun setFilter(filter: InboxFilter) {
-        _uiState.update { it.copy(activeFilter = filter, selectedTopicFilter = null) }
+        _uiState.update { it.copy(activeFilter = filter) }
     }
 
     fun setTopicFilter(topic: String?) {
@@ -880,5 +1168,9 @@ class MainViewModelFactory(
         streamRepository = container.streamRepository,
         deliveryController = container.deliveryController,
         deliveryStatusStore = container.deliveryStatusStore,
+        outboxRepository = container.outboxRepository,
     ) as T
 }
+
+/** The live configuration keeps its secret; the UI copy never does. */
+private fun ServerConfig.withoutSecret(): ServerConfig = copy(tokenOrPassword = "")

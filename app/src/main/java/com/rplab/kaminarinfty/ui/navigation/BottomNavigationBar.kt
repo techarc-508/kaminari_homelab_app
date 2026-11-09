@@ -15,12 +15,16 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Bookmark
-import androidx.compose.material.icons.filled.BookmarkBorder
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.NotificationsNone
+import androidx.compose.material.icons.filled.Outbox
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Topic
+import androidx.compose.material.icons.outlined.Edit
+import androidx.compose.material.icons.outlined.History
+import androidx.compose.material.icons.outlined.Outbox
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.Topic
 import androidx.compose.material3.Icon
@@ -62,12 +66,28 @@ sealed class NavigationItem(
         "nav_topics",
     )
 
-    object Saved : NavigationItem(
-        AppDestination.SAVED,
-        "Saved",
-        Icons.Default.Bookmark,
-        Icons.Default.BookmarkBorder,
-        "nav_saved",
+    object Compose : NavigationItem(
+        AppDestination.COMPOSE,
+        "Compose",
+        Icons.Default.Edit,
+        Icons.Outlined.Edit,
+        "nav_compose",
+    )
+
+    object Outbox : NavigationItem(
+        AppDestination.OUTBOX,
+        "Outbox",
+        Icons.Default.Outbox,
+        Icons.Outlined.Outbox,
+        "nav_outbox",
+    )
+
+    object Activity : NavigationItem(
+        AppDestination.ACTIVITY,
+        "Activity",
+        Icons.Default.History,
+        Icons.Outlined.History,
+        "nav_activity",
     )
 
     object Settings : NavigationItem(
@@ -82,7 +102,9 @@ sealed class NavigationItem(
 val NavItems = listOf(
     NavigationItem.Inbox,
     NavigationItem.Topics,
-    NavigationItem.Saved,
+    NavigationItem.Compose,
+    NavigationItem.Outbox,
+    NavigationItem.Activity,
     NavigationItem.Settings,
 )
 
@@ -98,11 +120,13 @@ fun NftyBottomNavigationBar(
             .background(KaminariTheme.colors.surfaceMain)
             .border(
                 width = 0.85.dp,
-                color = KaminariTheme.colors.border.copy(alpha = if (KaminariTheme.colors.isDark) 0.6f else 0.45f),
-                shape = RoundedCornerShape(0.dp)
+                color = KaminariTheme.colors.border.copy(
+                    alpha = if (KaminariTheme.colors.isDark) 0.6f else 0.45f
+                ),
+                shape = RoundedCornerShape(0.dp),
             )
             .navigationBarsPadding()
-            .padding(horizontal = 12.dp, vertical = 6.dp)
+            .padding(horizontal = 4.dp, vertical = 5.dp)
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -114,15 +138,18 @@ fun NftyBottomNavigationBar(
 
                 Box(
                     modifier = Modifier
-                        .clip(RoundedCornerShape(10.dp))
+                        .weight(1f)
+                        .clip(RoundedCornerShape(8.dp))
                         .background(
                             if (isSelected) {
                                 if (KaminariTheme.colors.isDark) KaminariTheme.colors.surfaceElevated
                                 else KaminariTheme.colors.surfaceSecondary
-                            } else Color.Transparent
+                            } else {
+                                Color.Transparent
+                            }
                         )
                         .clickable { onTabSelected(item.destination) }
-                        .padding(horizontal = 16.dp, vertical = 6.dp)
+                        .padding(horizontal = 1.dp, vertical = 5.dp)
                         .testTag(item.testTag),
                     contentAlignment = Alignment.Center,
                 ) {
@@ -133,18 +160,21 @@ fun NftyBottomNavigationBar(
                         Icon(
                             imageVector = if (isSelected) item.selectedIcon else item.unselectedIcon,
                             contentDescription = item.title,
-                            tint = if (isSelected) KaminariTheme.colors.accent else KaminariTheme.colors.textSecondary,
-                            modifier = Modifier.size(20.dp)
+                            tint = if (isSelected) KaminariTheme.colors.accent
+                            else KaminariTheme.colors.textSecondary,
+                            modifier = Modifier.size(19.dp),
                         )
 
-                        Spacer(modifier = Modifier.height(3.dp))
+                        Spacer(modifier = Modifier.height(2.dp))
 
                         Text(
                             text = item.title,
                             fontFamily = RubikFontFamily,
-                            fontSize = 11.sp,
+                            fontSize = 9.sp,
                             fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
-                            color = if (isSelected) KaminariTheme.colors.textPrimary else KaminariTheme.colors.textSecondary,
+                            color = if (isSelected) KaminariTheme.colors.textPrimary
+                            else KaminariTheme.colors.textSecondary,
+                            maxLines = 1,
                         )
                     }
                 }

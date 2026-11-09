@@ -38,6 +38,9 @@ sealed interface SendOutcome {
 interface OutboxRepository {
     fun observe(profileId: String, limit: Int = 100): Flow<List<OutboxEntry>>
 
+    /** Exact count for the profile-scoped URL-change preview. */
+    suspend fun count(profileId: String): Int
+
     /** Validates and persists one intent; never touches the network. */
     suspend fun enqueue(profileId: String, request: PublishRequest): Result<String>
 
@@ -82,6 +85,11 @@ class RoomOutboxRepository(
         if (profileId.isBlank()) return flowOf(emptyList())
         return outboxDao.observeRecent(profileId, limit.coerceAtLeast(1))
             .map { rows -> rows.map(::toDomain) }
+    }
+
+    override suspend fun count(profileId: String): Int {
+        if (profileId.isBlank()) return 0
+        return outboxDao.count(profileId)
     }
 
     override suspend fun enqueue(profileId: String, request: PublishRequest): Result<String> {

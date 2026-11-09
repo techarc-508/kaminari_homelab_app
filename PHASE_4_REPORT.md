@@ -1,13 +1,14 @@
 # Phase 4 Report — Compose, Activity and Command Centre
 
-**Status:** Stage C complete. Stages D–F not started.
+**Status:** Stage D complete. Stages E–F not started.
 **Last updated:** 2026-11-10
-**Owner authorization:** Stage A approved 2026-11-09; Stage B authorised 2026-11-10; Stage C authorised 2026-11-10.
-**Stage A checkpoint:** `db6e77a`. **Stage A.1:** `49e3159`. **Stage B:** `675ec14`.
+**Owner authorization:** Stage A approved 2026-11-09; Stage B authorised 2026-11-10; Stage C authorised 2026-11-10; Stage D authorised 2026-11-10.
+**Stage A checkpoint:** `db6e77a`. **Stage A.1:** `49e3159`. **Stage B:** `675ec14`. **Stage C:** `85186f9`. **Stage D:** recorded in `PHASE_4_STAGE_D_REPORT.md`.
 
 This is the living Phase 4 report. Stage A has its own detailed report:
 `PHASE_4_STAGE_A_REPORT.md`; Stage B has `PHASE_4_STAGE_B_REPORT.md`; Stage C has
-`PHASE_4_STAGE_C_REPORT.md`. Later stages append here.
+`PHASE_4_STAGE_C_REPORT.md`; Stage D has `PHASE_4_STAGE_D_REPORT.md`. Later
+stages append here.
 
 ---
 
@@ -18,7 +19,7 @@ This is the living Phase 4 report. Stage A has its own detailed report:
 | A | Room v2, `MIGRATION_1_2`, DAOs, schema export, migration/DAO tests | **Complete** |
 | B | Shared `NtfyAuth`, `PublishValidator`, JSON publish client, MockWebServer contracts | **Complete** |
 | C | `OutboxRepository`, `ActivityRepository`, receive-event transaction, manual retry, recovery, retention | **Complete** |
-| D | Publish/Activity/Command ViewModels, five destinations, Saved filter, profile switch/preview | Not started |
+| D | Integrated Compose UI: six destinations, Inbox/Topics/Compose/Outbox/Activity/Settings, Saved filter, profile switch/preview | **Complete** |
 | E | `rplab.command.v1` envelope, policy, command repository, `MockCommandExecutor`, CommandPanel | Not started |
 | F | Full gate, independent QA, final Phase 4 report | Not started |
 
@@ -97,6 +98,37 @@ Full detail: `PHASE_4_STAGE_B_REPORT.md`.
 
 Full detail: `PHASE_4_STAGE_C_REPORT.md`.
 
+---
+
+## Stage D outcome
+
+- Six primary destinations are implemented and connected to the existing
+  repositories: Inbox, Topics, Compose, Outbox, Activity and Settings. The
+  owner's Stage D instruction supersedes the older five-destination wording;
+  there is still no command tab.
+- `PublishViewModel` and `PublishScreen` validate before enqueue, use the Stage C
+  outbox, distinguish sending/accepted/failed/ambiguous outcomes, state that
+  server acceptance is not delivery, guard duplicate taps, preserve drafts after
+  failure and require confirmation before retrying an ambiguous publish.
+- `OutboxScreen` is profile-scoped and supports explicit statuses, safe previews,
+  attempts, failure text, manual retry and safe removal. No automatic retry or
+  background resend exists.
+- `ActivityViewModel`/`ActivityScreen` provide a Room-backed, profile-scoped
+  timeline with All/Publish/Inbox/Attention filters and sanitized summaries.
+- Inbox supports Saved as a filter, inline search, refresh, read/unread, save,
+  detail and confirmed destructive actions.
+- Topics lists the profile's subscriptions and supports add, subscribe,
+  unsubscribe (confirmed), pause/resume and filtered-Inbox navigation. The
+  current model has no priority-threshold field, so no fake control was added.
+- Settings lists profiles, shows the active server, supports add/edit/select,
+  safe switching, delivery modes, notification status, theme/density and local
+  data actions. URL changes show the existing counts preview. Creating a new
+  profile for a changed URL requires credential re-entry rather than copying a
+  stored secret silently.
+- No new dependency, migration, schema, command execution or binary upload was
+  added. Room v2 is unchanged.
+
+Full detail: `PHASE_4_STAGE_D_REPORT.md`.
 
 ---
 
@@ -107,12 +139,11 @@ Full detail: `PHASE_4_STAGE_C_REPORT.md`.
 # exit 0 — 36 tests, 0 failures, 0 errors, 0 skipped
 
 ./gradlew testDebugUnitTest --rerun-tasks
-# exit 0 — 286 tests, 0 failures, 0 errors, 2 pre-existing skips
-#   (Stage C adds 46: OutboxRepository 29, ActivityRepository 9,
-#    MessageRepositoryActivity 4, OutboxIntegration 4; Stage B added 39)
+# exit 0 — 322 tests, 0 failures, 0 errors, 2 pre-existing skips
+#   (Stage D adds 36; Stage C added 46; Stage B added 39)
 
 ./gradlew assembleDebug
-# exit 0 — app-debug.apk, 19,777,789 bytes
+# exit 0 — app-debug.apk, 19,950,553 bytes
 
 ./gradlew lintDebug
 # exit 0 — 0 errors, 56 warnings
@@ -133,21 +164,22 @@ substitute for device validation; see R-23.
 | R-25 | `LIKE` search is not FTS. | Accepted, measure on device |
 | R-26 | Pruning removes old terminal history by design. | Accepted, documented |
 
-Stage C adds orchestration only; it does not send automatically and does not
+Stage D adds UI wiring only; it does not send automatically, execute commands or
 call a real server. R-17 (real origin HTTP 502), the device matrix and the
 absence of a real ntfy publish/receive smoke test remain open. MockWebServer
-remains the network-layer evidence from Stage B.
+remains the network-layer evidence from Stage B. The compose draft is not
+persisted through process death, and no per-topic priority threshold exists in
+Room v2 — neither is hidden with mock behavior.
 
 ---
 
 ## Approval required
 
-**Stage C is complete. Stage D has not started.**
+**Stage D is complete. Stage E has not started.**
 
-Before Stage D:
+Before Stage E:
 
-> Review `PHASE_4_STAGE_C_REPORT.md` and authorise Stage D (publish, activity and
-> command ViewModels; five-destination navigation; Saved filter; profile
-> switching and URL-change preview).
+> Review `PHASE_4_STAGE_D_REPORT.md` and authorise Stage E (`rplab.command.v1`
+> envelope, policy, command repository, `MockCommandExecutor` and CommandPanel).
 
-No Stage D code will be written until that approval is recorded.
+No Stage E code will be written until that approval is recorded.

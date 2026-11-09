@@ -11,9 +11,11 @@ import com.rplab.kaminarinfty.model.NftyErrorCategory
 import com.rplab.kaminarinfty.model.NftyException
 import com.rplab.kaminarinfty.model.NftyMessage
 import com.rplab.kaminarinfty.model.ServerConfig
+import com.rplab.kaminarinfty.model.ServerProfile
 import com.rplab.kaminarinfty.model.StreamUpdate
 import com.rplab.kaminarinfty.testing.FakeDeliveryController
 import com.rplab.kaminarinfty.testing.FakeMessageRepository
+import com.rplab.kaminarinfty.testing.FakeOutboxRepository
 import com.rplab.kaminarinfty.testing.FakePreferences
 import com.rplab.kaminarinfty.testing.FakeProfileRepository
 import com.rplab.kaminarinfty.testing.FakeStreamRepository
@@ -23,6 +25,7 @@ import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -55,8 +58,10 @@ class MainViewModelTest {
         }
     }
 
-    private fun buildViewModel() = MainViewModel(
-        messages, profiles, preferences, stream, delivery, deliveryStatus,
+    private fun buildViewModel(
+        outbox: FakeOutboxRepository? = null,
+    ) = MainViewModel(
+        messages, profiles, preferences, stream, delivery, deliveryStatus, outbox,
     )
 
     private fun liveMessage(id: String = "live_1") = NftyMessage(
@@ -324,6 +329,142 @@ class MainViewModelTest {
         assertEquals("profile-test", preferences.state.value.activeProfileId)
         assertEquals("profile-test", vm.uiState.value.activeProfileId)
     }
+
+    @Test
+    fun `switching profile stops delivery and keeps stored history`() = runTest(mainRule.dispatcher) {
+        preferences.state.value = preferences.state.value.copy(activeProfileId = "primary")
+        profiles.config = ServerConfig(serverUrl = "https://ntfy.test", authMethod = AuthMethod.GUEST)
+        messages.stored += liveMessage("keep-me")
+        val vm = buildViewModel()
+        advanceUntilIdle()
+
+        vm.switchProfile("profile-test")
+        advanceUntilIdle()
+
+        assertEquals("profile-test", preferences.state.value.activeProfileId)
+        assertEquals("profile-test", vm.uiState.value.activeProfileId)
+        assertTrue(delivery.instantStops >= 1)
+        assertTrue(delivery.batteryCancels >= 1)
+        assertEquals(0, messages.clearHistoryCalls)
+        assertTrue(messages.stored.any { it.id == "keep-me" })
+    }
+
+    @Test
+    fun `URL change preview reports profile-scoped counts before saving`() = runTest(mainRule.dispatcher) {
+        preferences.state.value = preferences.state.value.copy(activeProfileId = "primary")
+        profiles.config = ServerConfig(serverUrl = "https://ntfy.test", authMethod = AuthMethod.GUEST)
+        profiles.profilesFlow.value = listOf(
+            ServerProfile(
+                id = "primary",
+                displayName = "home",
+                baseUrl = "https://ntfy.test",
+                authMethod = AuthMethod.GUEST,
+                hasStoredSecret = false,
+                createdAt = 0L,
+                updatedAt = 0L,
+            )
+        )
+        profiles.topicsFlow.value = listOf(
+            com.rplab.kaminarinfty.model.NftyTopic(name = "ops", description = "")
+        )
+        messages.stored += liveMessage("one")
+        messages.stored += liveMessage("two")
+        val outbox = FakeOutboxRepository().apply {
+            entries.value = listOf(
+                com.rplab.kaminarinfty.model.OutboxEntry(
+                    clientId = "a", profileId = "primary", topic = "ops", title = null,
+                    body = "x", priority = 3, tags = emptyList(), clickUrl = null,
+                    attachmentUrl = null, delay = null,
+                    state = com.rplab.kaminarinfty.model.OutboxState.QUEUED,
+                    attemptCount = 0, retryable = false, lastError = null,
+                    serverMessageId = null, createdAt = 0L, updatedAt = 0L,
+                    acceptedAt = null,
+                ),
+                com.rplab.kaminarinfty.model.OutboxEntry(
+                    clientId = "b", profileId = "primary", topic = "ops", title = null,
+                    body = "y", priority = 3, tags = emptyList(), clickUrl = null,
+                    attachmentUrl = null, delay = null,
+                    state = com.rplab.kaminarinfty.model.OutboxState.FAILED,
+                    attemptCount = 1, retryable = true, lastError = "no",
+                    serverMessageId = null, createdAt = 0L, updatedAt = 0L,
+                    acceptedAt = null,
+                ),
+            )
+        }
+        val vm = buildViewModel(outbox)
+        advanceUntilIdle()
+
+        vm.startProfileEdit("primary")
+        advanceUntilIdle()
+        vm.saveProfileEdit(
+            serverUrl = "https://new.example.test",
+            authMethod = AuthMethod.GUEST,
+            username = "",
+            newSecret = "",
+            useHttpsOnly = true,
+        )
+        advanceUntilIdle()
+
+        val preview = vm.uiState.value.profileChangePreview
+        assertEquals("https://new.example.test", preview?.destinationUrl)
+        assertEquals(2, preview?.messages)
+        assertEquals(1, preview?.topics)
+        assertEquals(2, preview?.outbox)
+        assertTrue(profiles.updatedProfiles.isEmpty())
+
+        vm.confirmProfileChange(createNew = false)
+        advanceUntilIdle()
+
+        assertEquals(1, profiles.updatedProfiles.size)
+        assertEquals("primary", profiles.updatedProfiles.single().first)
+        assertEquals(2, messages.stored.size)
+        assertTrue(messages.clearHistoryCalls == 0)
+    }
+
+    @Test
+    fun `creating a profile for a new URL never copies a stored secret implicitly`() =
+        runTest(mainRule.dispatcher) {
+            preferences.state.value = preferences.state.value.copy(activeProfileId = "primary")
+            profiles.config = ServerConfig(
+                serverUrl = "https://ntfy.test",
+                authMethod = AuthMethod.ACCESS_TOKEN,
+                tokenOrPassword = "old-secret",
+            )
+            profiles.profilesFlow.value = listOf(
+                ServerProfile(
+                    id = "primary",
+                    displayName = "home",
+                    baseUrl = "https://ntfy.test",
+                    authMethod = AuthMethod.ACCESS_TOKEN,
+                    hasStoredSecret = true,
+                    createdAt = 0L,
+                    updatedAt = 0L,
+                )
+            )
+            val vm = buildViewModel()
+            advanceUntilIdle()
+
+            vm.startProfileEdit("primary")
+            advanceUntilIdle()
+            vm.saveProfileEdit(
+                serverUrl = "https://new.example.test",
+                authMethod = AuthMethod.ACCESS_TOKEN,
+                username = "",
+                newSecret = "",
+                useHttpsOnly = true,
+            )
+            advanceUntilIdle()
+            assertNotNull(vm.uiState.value.profileChangePreview)
+
+            vm.confirmProfileChange(createNew = true)
+            advanceUntilIdle()
+
+            assertNull(vm.uiState.value.profileChangePreview)
+            assertTrue(vm.uiState.value.profileEditError.orEmpty().contains("Enter the credential"))
+            assertEquals("https://ntfy.test", profiles.config?.serverUrl)
+            assertEquals("old-secret", profiles.config?.tokenOrPassword)
+            assertEquals("primary", preferences.state.value.activeProfileId)
+        }
 
     @Test
     fun `a topic-less server clear never wipes local history`() = runTest(mainRule.dispatcher) {

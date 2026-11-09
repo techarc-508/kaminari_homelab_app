@@ -17,8 +17,10 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.BrightnessAuto
 import androidx.compose.material.icons.filled.DarkMode
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.Notifications
@@ -33,6 +35,10 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -41,9 +47,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.rplab.kaminarinfty.BuildConfig
+import com.rplab.kaminarinfty.ProfileEditUi
 import com.rplab.kaminarinfty.ThemeSetting
-import com.rplab.kaminarinfty.model.AuthState
 import com.rplab.kaminarinfty.delivery.DeliveryStatus
+import com.rplab.kaminarinfty.model.AuthState
 import com.rplab.kaminarinfty.model.DeliveryMode
 import com.rplab.kaminarinfty.model.ServerConfig
 import com.rplab.kaminarinfty.model.ServerProfile
@@ -51,6 +58,7 @@ import com.rplab.kaminarinfty.ui.components.NftyTopBar
 import com.rplab.kaminarinfty.ui.theme.JetBrainsMonoFontFamily
 import com.rplab.kaminarinfty.ui.theme.KaminariTheme
 import com.rplab.kaminarinfty.ui.theme.RubikFontFamily
+import com.rplab.kaminarinfty.model.AuthMethod
 
 @Composable
 fun SettingsScreen(
@@ -66,12 +74,23 @@ fun SettingsScreen(
     sampleDataEnabled: Boolean,
     historyCount: Int,
     malformedLines: Int,
+    profileEdit: ProfileEditUi?,
+    profileEditError: String?,
     onThemeChange: (ThemeSetting) -> Unit,
     onToggleDensity: () -> Unit,
     onTestConnection: () -> Unit,
     onSelectProfile: (String) -> Unit,
+    onEditProfile: (String) -> Unit,
+    onAddProfile: (ServerConfig) -> Unit,
+    onCancelProfileEdit: () -> Unit,
+    onSaveProfileEdit: (
+        url: String,
+        authMethod: AuthMethod,
+        username: String,
+        newSecret: String,
+        httpsOnly: Boolean,
+    ) -> Unit,
     onCatchUp: () -> Unit,
-    onNavigateToSetup: () -> Unit,
     onClearHistory: () -> Unit,
     onClearSaved: () -> Unit,
     onToggleSampleData: (Boolean) -> Unit,
@@ -83,6 +102,9 @@ fun SettingsScreen(
     onSearchClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    var showAddProfile by remember { mutableStateOf(false) }
+    val activeProfile = profiles.firstOrNull { it.id == activeProfileId }
+
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -111,13 +133,25 @@ fun SettingsScreen(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Column {
-                            Text("Server Endpoint", fontFamily = RubikFontFamily, fontSize = 12.sp, color = KaminariTheme.colors.textSecondary)
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = activeProfile?.displayName ?: "No active profile",
+                                fontFamily = RubikFontFamily,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = KaminariTheme.colors.textPrimary,
+                            )
                             Text(
                                 serverConfig.serverUrl.ifBlank { "Not configured" },
                                 fontFamily = JetBrainsMonoFontFamily,
-                                fontSize = 13.sp,
-                                color = KaminariTheme.colors.textPrimary,
+                                fontSize = 11.sp,
+                                color = KaminariTheme.colors.textSecondary,
+                            )
+                            Text(
+                                serverConfig.authMethod.displayName,
+                                fontFamily = RubikFontFamily,
+                                fontSize = 10.sp,
+                                color = KaminariTheme.colors.textSecondary,
                             )
                         }
                         Box(
@@ -131,19 +165,9 @@ fun SettingsScreen(
                                 text = authState.statusLabel,
                                 fontFamily = JetBrainsMonoFontFamily,
                                 fontSize = 9.sp,
-                                color = if (authState.isConnected) KaminariTheme.colors.success else KaminariTheme.colors.textSecondary,
+                                color = if (authState.isConnected) KaminariTheme.colors.success
+                                else KaminariTheme.colors.textSecondary,
                             )
-                        }
-                    }
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Column {
-                            Text("Auth Protocol", fontFamily = RubikFontFamily, fontSize = 12.sp, color = KaminariTheme.colors.textSecondary)
-                            Text(serverConfig.authMethod.displayName, fontFamily = RubikFontFamily, fontSize = 13.sp, color = KaminariTheme.colors.textPrimary)
                         }
                     }
 
@@ -157,12 +181,20 @@ fun SettingsScreen(
                             shape = RoundedCornerShape(6.dp),
                             border = androidx.compose.foundation.BorderStroke(1.dp, KaminariTheme.colors.border),
                         ) {
-                            Text("Test Link", fontFamily = RubikFontFamily, fontSize = 12.sp, color = KaminariTheme.colors.textPrimary)
+                            Text(
+                                "Test Link",
+                                fontFamily = RubikFontFamily,
+                                fontSize = 12.sp,
+                                color = KaminariTheme.colors.textPrimary,
+                            )
                         }
 
                         Button(
-                            onClick = onNavigateToSetup,
-                            modifier = Modifier.weight(1f),
+                            onClick = { activeProfileId?.let(onEditProfile) },
+                            enabled = activeProfileId != null,
+                            modifier = Modifier
+                                .weight(1f)
+                                .testTag("edit_active_profile"),
                             colors = ButtonDefaults.buttonColors(
                                 containerColor = KaminariTheme.colors.surfaceSecondary,
                                 contentColor = KaminariTheme.colors.accent,
@@ -170,7 +202,14 @@ fun SettingsScreen(
                             shape = RoundedCornerShape(6.dp),
                             border = androidx.compose.foundation.BorderStroke(1.dp, KaminariTheme.colors.border),
                         ) {
-                            Text("Reconfigure", fontFamily = RubikFontFamily, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                            Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(14.dp))
+                            Spacer(modifier = Modifier.size(4.dp))
+                            Text(
+                                "Edit",
+                                fontFamily = RubikFontFamily,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                            )
                         }
                     }
                 }
@@ -181,7 +220,7 @@ fun SettingsScreen(
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     if (profiles.isEmpty()) {
                         Text(
-                            text = "No saved profiles yet — connect once to create the first one.",
+                            text = "No saved profiles yet — add one to start receiving notifications.",
                             fontFamily = RubikFontFamily,
                             fontSize = 12.sp,
                             color = KaminariTheme.colors.textSecondary,
@@ -232,21 +271,60 @@ fun SettingsScreen(
                                         border = androidx.compose.foundation.BorderStroke(1.dp, KaminariTheme.colors.border),
                                         modifier = Modifier.testTag("use_profile_${profile.id}"),
                                     ) {
-                                        Text("Use", fontFamily = RubikFontFamily, fontSize = 11.sp, color = KaminariTheme.colors.textPrimary)
+                                        Text(
+                                            "Use",
+                                            fontFamily = RubikFontFamily,
+                                            fontSize = 11.sp,
+                                            color = KaminariTheme.colors.textPrimary,
+                                        )
                                     }
                                 }
                             }
                         }
                     }
 
-                    OutlinedButton(
-                        onClick = onCatchUp,
-                        modifier = Modifier.fillMaxWidth().testTag("resync_history_button"),
-                        shape = RoundedCornerShape(6.dp),
-                        border = androidx.compose.foundation.BorderStroke(1.dp, KaminariTheme.colors.border),
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
-                        Text("Re-sync missed history", fontFamily = RubikFontFamily, fontSize = 12.sp, color = KaminariTheme.colors.textPrimary)
+                        OutlinedButton(
+                            onClick = { showAddProfile = true },
+                            modifier = Modifier
+                                .weight(1f)
+                                .testTag("add_server_profile"),
+                            shape = RoundedCornerShape(6.dp),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, KaminariTheme.colors.border),
+                        ) {
+                            Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(14.dp))
+                            Spacer(modifier = Modifier.size(4.dp))
+                            Text(
+                                "Add Profile",
+                                fontFamily = RubikFontFamily,
+                                fontSize = 11.sp,
+                                color = KaminariTheme.colors.textPrimary,
+                            )
+                        }
+                        OutlinedButton(
+                            onClick = onCatchUp,
+                            modifier = Modifier
+                                .weight(1f)
+                                .testTag("resync_history_button"),
+                            shape = RoundedCornerShape(6.dp),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, KaminariTheme.colors.border),
+                        ) {
+                            Text(
+                                "Re-sync History",
+                                fontFamily = RubikFontFamily,
+                                fontSize = 11.sp,
+                                color = KaminariTheme.colors.textPrimary,
+                            )
+                        }
                     }
+                    Text(
+                        text = "Switching never deletes the old profile's messages, topics or credentials.",
+                        style = KaminariTheme.techTypography.metricSubtext,
+                        color = KaminariTheme.colors.textSecondary,
+                    )
                 }
             }
 
@@ -318,8 +396,18 @@ fun SettingsScreen(
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Column {
-                            Text("Compact Density", fontFamily = RubikFontFamily, fontSize = 13.sp, color = KaminariTheme.colors.textPrimary)
-                            Text("Reduces vertical row padding for dense monitoring", fontFamily = RubikFontFamily, fontSize = 11.sp, color = KaminariTheme.colors.textSecondary)
+                            Text(
+                                "Compact Density",
+                                fontFamily = RubikFontFamily,
+                                fontSize = 13.sp,
+                                color = KaminariTheme.colors.textPrimary,
+                            )
+                            Text(
+                                "Reduces vertical row padding for dense monitoring",
+                                fontFamily = RubikFontFamily,
+                                fontSize = 11.sp,
+                                color = KaminariTheme.colors.textSecondary,
+                            )
                         }
                         Switch(
                             checked = isCompactDensity,
@@ -357,7 +445,12 @@ fun SettingsScreen(
                                 border = androidx.compose.foundation.BorderStroke(1.dp, KaminariTheme.colors.border),
                                 modifier = Modifier.testTag("open_notification_settings"),
                             ) {
-                                Text("Allow", fontFamily = RubikFontFamily, fontSize = 11.sp, color = KaminariTheme.colors.textPrimary)
+                                Text(
+                                    "Allow",
+                                    fontFamily = RubikFontFamily,
+                                    fontSize = 11.sp,
+                                    color = KaminariTheme.colors.textPrimary,
+                                )
                             }
                         }
                     }
@@ -447,14 +540,19 @@ fun SettingsScreen(
             }
 
             // Section 5: LOCAL DATA
-            SettingsSectionCard(title = "LOCAL DATA & CACHE", icon = Icons.Default.Storage) {
+            SettingsSectionCard(title = "LOCAL DATA & RETENTION", icon = Icons.Default.Storage) {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Text("Stored notifications", fontFamily = RubikFontFamily, fontSize = 13.sp, color = KaminariTheme.colors.textPrimary)
+                        Text(
+                            "Stored notifications",
+                            fontFamily = RubikFontFamily,
+                            fontSize = 13.sp,
+                            color = KaminariTheme.colors.textPrimary,
+                        )
                         Text(
                             "$historyCount",
                             fontFamily = JetBrainsMonoFontFamily,
@@ -463,14 +561,30 @@ fun SettingsScreen(
                         )
                     }
 
+                    Text(
+                        text = "Retention: activity 90 days / 5,000 events; outbox 30 days / 500 terminal rows. Queued and sending publishes are never pruned.",
+                        style = KaminariTheme.techTypography.metricSubtext,
+                        color = KaminariTheme.colors.textSecondary,
+                    )
+
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Column {
-                            Text("Demo Dataset", fontFamily = RubikFontFamily, fontSize = 13.sp, color = KaminariTheme.colors.textPrimary)
-                            Text("Shows sample notifications only; never written to history", fontFamily = RubikFontFamily, fontSize = 11.sp, color = KaminariTheme.colors.textSecondary)
+                            Text(
+                                "Demo Dataset",
+                                fontFamily = RubikFontFamily,
+                                fontSize = 13.sp,
+                                color = KaminariTheme.colors.textPrimary,
+                            )
+                            Text(
+                                "Shows sample notifications only; never written to history",
+                                fontFamily = RubikFontFamily,
+                                fontSize = 11.sp,
+                                color = KaminariTheme.colors.textSecondary,
+                            )
                         }
                         Switch(
                             checked = sampleDataEnabled,
@@ -486,20 +600,34 @@ fun SettingsScreen(
                     ) {
                         OutlinedButton(
                             onClick = onClearHistory,
-                            modifier = Modifier.weight(1f),
+                            modifier = Modifier
+                                .weight(1f)
+                                .testTag("clear_history_button"),
                             shape = RoundedCornerShape(6.dp),
                             border = androidx.compose.foundation.BorderStroke(1.dp, KaminariTheme.colors.border),
                         ) {
-                            Text("Clear History", fontFamily = RubikFontFamily, fontSize = 11.sp, color = KaminariTheme.colors.textPrimary)
+                            Text(
+                                "Clear History",
+                                fontFamily = RubikFontFamily,
+                                fontSize = 11.sp,
+                                color = KaminariTheme.colors.textPrimary,
+                            )
                         }
 
                         OutlinedButton(
                             onClick = onClearSaved,
-                            modifier = Modifier.weight(1f),
+                            modifier = Modifier
+                                .weight(1f)
+                                .testTag("clear_saved_button"),
                             shape = RoundedCornerShape(6.dp),
                             border = androidx.compose.foundation.BorderStroke(1.dp, KaminariTheme.colors.border),
                         ) {
-                            Text("Clear Saved", fontFamily = RubikFontFamily, fontSize = 11.sp, color = KaminariTheme.colors.textPrimary)
+                            Text(
+                                "Clear Saved",
+                                fontFamily = RubikFontFamily,
+                                fontSize = 11.sp,
+                                color = KaminariTheme.colors.textPrimary,
+                            )
                         }
                     }
                 }
@@ -527,8 +655,34 @@ fun SettingsScreen(
                 }
             }
 
+            Text(
+                text = "PRIVACY // Credentials are stored only in the Android Keystore-backed secret store. This screen never renders a stored secret.",
+                style = KaminariTheme.techTypography.metricSubtext,
+                color = KaminariTheme.colors.textSecondary,
+                modifier = Modifier.padding(horizontal = 4.dp),
+            )
+
             Spacer(modifier = Modifier.height(60.dp))
         }
+    }
+
+    if (showAddProfile) {
+        AddProfileDialog(
+            onDismiss = { showAddProfile = false },
+            onAdd = { config ->
+                showAddProfile = false
+                onAddProfile(config)
+            },
+        )
+    }
+
+    profileEdit?.let { edit ->
+        ProfileEditDialog(
+            edit = edit,
+            error = profileEditError,
+            onDismiss = onCancelProfileEdit,
+            onSave = onSaveProfileEdit,
+        )
     }
 }
 

@@ -3,7 +3,7 @@
 **Status:** Stage D complete. Stages E–F not started.
 **Last updated:** 2026-11-10
 **Owner authorization:** Stage A approved 2026-11-09; Stage B authorised 2026-11-10; Stage C authorised 2026-11-10; Stage D authorised 2026-11-10.
-**Stage A checkpoint:** `db6e77a`. **Stage A.1:** `49e3159`. **Stage B:** `675ec14`. **Stage C:** `85186f9`. **Stage D:** recorded in `PHASE_4_STAGE_D_REPORT.md`.
+**Stage A checkpoint:** `db6e77a`. **Stage A.1:** `49e3159`. **Stage B:** `675ec14`. **Stage C:** `85186f9`. **Stage D:** `4747786`.
 
 This is the living Phase 4 report. Stage A has its own detailed report:
 `PHASE_4_STAGE_A_REPORT.md`; Stage B has `PHASE_4_STAGE_B_REPORT.md`; Stage C has

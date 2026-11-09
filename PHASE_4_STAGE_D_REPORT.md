@@ -4,7 +4,7 @@
 **Status:** Complete. Stage E not started.
 **Date:** 2026-11-10
 **Owner authorization:** Stage C accepted; Stage D explicitly authorized.
-**Checkpoint commit:** to be recorded below after the Stage D code commit.
+**Checkpoint commit:** `4747786` — *phase-4/stage-d: connect the Compose UI to existing repositories*.
 **Schema:** Room v2 unchanged. No new entity, table, column or migration.
 **Dependencies:** none added.
 
@@ -291,4 +291,4 @@ Not implemented in Stage D:
 Stage D code, tests and documentation are checkpointed in the commit recorded
 below. Stage E has not been started.
 
-**Checkpoint commit:** to be recorded after the Stage D commit.
+**Checkpoint commit:** `4747786`. The report-hash update is a follow-up documentation commit.

@@ -100,6 +100,7 @@ existing tables. No destructive migration; no fallback.
 | `priority` | INTEGER NOT NULL | 1–5 |
 | `tagsJson` | TEXT NOT NULL | JSON array, ≤ 10 tags |
 | `clickUrl` | TEXT | optional, http/https only |
+| `attachmentUrl` | TEXT | optional, http/https URL; the server fetches it. Binary upload is deferred |
 | `actionsJson` | TEXT | optional, `view` actions only |
 | `delay` | TEXT | optional, e.g. `5m`; server-dependent |
 | `state` | TEXT NOT NULL | `QUEUED`, `SENDING`, `ACCEPTED`, `FAILED`, `AMBIGUOUS` |
@@ -207,10 +208,16 @@ Authorization: Basic … | Bearer …
   "priority": 4,
   "tags": ["floppy_disk", "white_check_mark"],
   "click": "https://example.invalid/run/42",
+  "attach": "https://example.invalid/files/backup.log",
   "actions": [{"action": "view", "label": "Open", "url": "https://example.invalid/run/42"}],
   "delay": "5m"
 }
 ```
+
+Attachment scope: `attach` accepts an **http/https URL** only; the ntfy server
+fetches it and derives the filename/type/size metadata. The app does not upload
+binary data, does not read local files, and never base64-encodes content in
+Phase 4.
 
 Why JSON rather than `POST /{topic}` headers:
 
@@ -235,6 +242,7 @@ data class PublishRequest(
     val priority: NftyPriority,
     val tags: List<String>,
     val clickUrl: String?,
+    val attachmentUrl: String?,
     val viewActions: List<NftyAction>,
     val delay: String?,
 )
@@ -361,6 +369,10 @@ interface ActivityRepository {
   `false` and writes no event.
 - Retention: 90 days and 5,000 rows per profile, pruned after each insert. The
   query is bounded by `(profileId, createdAt)`.
+- **Delivery events in Phase 4 are the outbox transitions** (`PUBLISH_ACCEPTED`,
+  `PUBLISH_FAILED`, `PUBLISH_AMBIGUOUS`). There is no server delivery receipt and
+  no read receipt. Local notification-shade display is an app-local action, not
+  server delivery, and is not recorded as one.
 - The timeline is Room-backed; no in-memory history.
 
 ## 7. Command envelope and mock executor
@@ -497,7 +509,7 @@ Inbox | Topics | Compose | Activity | Settings
 
 | Screen | Responsibility |
 |---|---|
-| `PublishScreen` | Validate and enqueue a publish; show outbox with honest states; retry/cancel |
+| `PublishScreen` | Validate and enqueue a publish (topic, title, body, priority, tags, click, attachment URL, view action, delay); show outbox with honest states; retry/cancel |
 | `ActivityScreen` | Room-backed timeline; filters; correlation links; no bodies |
 | `CommandPanel` | Allowlisted action form, expiry preview, destructive confirmation, mock results |
 | `InboxScreen` | Room window, filters incl. Saved, unread counts, profile-aware empty/offline states |
@@ -534,8 +546,8 @@ and no color-only statuses are required (E-Ink proofing starts here).
 - Publish JSON never includes credentials, profile secrets or gateway keys.
 - Activity summaries never include message bodies, titles or URLs. Sanitized
   error categories only.
-- Click and view-action URLs: http/https only, host required, no user-info, no
-  `javascript:`/`file:`/`intent:`, max 2048 chars.
+- Click, attachment and view-action URLs: http/https only, host required, no
+  user-info, no `javascript:`/`file:`/`intent:`, max 2048 chars.
 - Publish body size is capped (4 KiB UTF-8 message, 32 KiB JSON) before any
   network call; the server may impose a lower limit and is reported honestly.
 - `POST` redirects and OkHttp connection retries are disabled to avoid silent
@@ -581,7 +593,7 @@ itself is the source of truth.
 
 | Layer | Tests |
 |---|---|
-| Publish validation | topic, body bytes, title, tags, priority, URLs, actions, delay, JSON size |
+| Publish validation | topic, body bytes, title, tags, priority, click/attachment URLs, actions, delay, JSON size |
 | Publish client | MockWebServer 2xx/400/401/403/404/413/429/5xx, malformed success body, timeout, cancellation, no redirect replay |
 | Outbox | enqueue, claim race (`rowsUpdated = 0`), definitive/retryable/ambiguous, stuck-SENDING recovery, retry rules, cancel, prune |
 | Activity | receive event only on new message, no body leakage, retention cap, profile isolation |

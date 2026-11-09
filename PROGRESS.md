@@ -70,7 +70,9 @@ remains outstanding.
 
 - Phase 1 and Phase 2 commits are preserved (`f254cd6`, `e6cdba5`, `5d00827`).
 - Phase 3 is checkpointed in `72dbf36`.
-- The handoff and takeover report are committed after reconciliation.
+- The handoff is `2fe0ce6`; the takeover report and documentation reconciliation
+  are committed in `93c34d1`; the hygiene fix is `bc6b6cd`; decision cleanup is
+  `4140ca0`.
 - Never reset/clean the repository; do not rewrite history.
 
 ## Next

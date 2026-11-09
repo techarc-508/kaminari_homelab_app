@@ -132,7 +132,8 @@ generated, stop and report; do not hand-write a schema.
   `CommandStatus`.
 
 - [ ] Write the three entities exactly as specified (FK CASCADE, indices,
-      defaults). Use `Long` epoch millis; no `java.time`.
+      defaults), including the outbox `attachmentUrl` column for URL-only
+      attachments. Use `Long` epoch millis; no `java.time`.
 - [ ] Bump `KaminariDatabase` to `version = 2`, add the three entities, keep
       `exportSchema = true`.
 - [ ] Run `./gradlew :app:kspDebugKotlin --rerun-tasks`; confirm `2.json`.
@@ -225,8 +226,9 @@ green; no destructive fallback.
   where `PublishValidation` is `Valid` or `Invalid(errors: List<String>)`.
 
 - [ ] Tests: valid request; empty/oversized body (4 KiB UTF-8); long title;
-      >10 tags; invalid priority; `javascript:` click; user-info URL; >3
-      actions; non-`view` action; invalid delay; JSON >32 KiB.
+      >10 tags; invalid priority; `javascript:` click; user-info URL; invalid
+      attachment URL (non-http, user-info); >3 actions; non-`view` action;
+      invalid delay; JSON >32 KiB.
 - [ ] Implement; re-run; pass.
 - [ ] Commit: `publish: validate topic, payload, URLs and actions`.
 
@@ -244,8 +246,9 @@ green; no destructive fallback.
 - [ ] MockWebServer tests: 200 with `id`; 200 malformed body; 400; 401; 403;
       404; 413; 429; 500; `SocketTimeoutException` → `Ambiguous`;
       `ConnectException` → `Rejected(retryable=true)`; cancellation propagates;
-      redirect is not followed; request body contains JSON fields and no auth
-      secret in the body; `Authorization` header is correct.
+      redirect is not followed; request body contains JSON fields (`topic`,
+      `message`, `title`, `priority`, `tags`, `click`, `attach`, `actions`,
+      `delay`) and no auth secret in the body; `Authorization` header is correct.
 - [ ] Run; red. Implement JSON publish; run; green.
 - [ ] Commit: `net: add documented ntfy JSON publish client`.
 
@@ -335,10 +338,11 @@ retry path exists.
   `visibleLimit: Int`; `loadMore()`; `switchProfile(id)`;
   `prepareProfileChange(newUrl)`.
 
-- [ ] ViewModel tests first: form validation; double-tap send calls one send;
-      retry ambiguous requires confirmation; timeline filter; command
-      destructive confirmation required; profile switch clears the window and
-      reloads the new profile; URL preview returns correct counts.
+- [ ] ViewModel tests first: form validation (including attachment URL);
+      double-tap send calls one send; retry ambiguous requires confirmation;
+      timeline filter; command destructive confirmation required; profile switch
+      clears the window and reloads the new profile; URL preview returns correct
+      counts.
 - [ ] Implement; run targeted; green.
 - [ ] Commit: `ui: add publish/activity/command view models`.
 
@@ -353,8 +357,9 @@ retry path exists.
   `CommandPanelTest.kt`
 
 - [ ] Compose tests first: publish empty/loading/offline/accepted/failed/
-      ambiguous; mock banner visible; command confirmation gate; timeline empty;
-      accessibility labels for icon-only controls; no color-only status.
+      ambiguous; attachment-URL field and server-fetch copy; mock banner
+      visible; command confirmation gate; timeline empty; accessibility labels
+      for icon-only controls; no color-only status.
 - [ ] Implement the five-destination bar (`Inbox, Topics, Compose, Activity,
       Settings`), Saved filter, profile chip, Compose form + outbox list,
       Activity tabs, CommandPanel.

@@ -123,6 +123,12 @@ covered by dependencies and inspection, not a full configured integration test. 
 
 ## 8. Phase 4 scope (do not start without owner approval)
 
+> **Scope correction (2026-11-09, owner-approved):** `PLAN.md` is authoritative.
+> Phase 4 is publish/outbox/activity/command envelope with a **mock** executor.
+> E-Ink is Phase 5; ntfy administration and the real PVE gateway are Phase 6.
+> The list below is a combined roadmap, not Phase 4 scope. See
+> `PHASE_4_ARCHITECTURE.md` and `PHASE_4_IMPLEMENTATION_PLAN.md`.
+
 Compose/publish screen and send outbox; activity timeline (receive, send, server acceptance, command
 request/result); command centre with a trusted PVE gateway; dedicated E-Ink profile; ntfy
 administration grounded in verified server capabilities.

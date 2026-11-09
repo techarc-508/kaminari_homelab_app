@@ -392,7 +392,7 @@ Deliver:
 - Safe typed command envelope (`rplab.command.v1`), allowlist, expiry, single-use nonce, destructive-action confirmation and a **mock** executor only.
 - Multiple server profiles with clear active identity, safe switching and a URL-change preview.
 
-Gate: full publish round trip demonstrated with a correlation ID and honest state labels; migration test passes or is recorded as device-blocked; independent QA audit.
+Gate: full publish round trip demonstrated against MockWebServer with a correlation ID and honest state labels; a real-server round trip is blocked by the current HTTP 502 and must be recorded as a condition, never claimed; migration test passes or is recorded as device-blocked; independent QA audit.
 
 **Phase scope correction:** E-Ink belongs to Phase 5 (low-end/E-Ink). ntfy administration and the PVE command gateway belong to Phase 6. Phase 4 does not implement binary attachment upload, automatic background publish retries, real PVE execution, ntfy administration, E-Ink tuning or release signing. This section supersedes the earlier handoff wording.
 

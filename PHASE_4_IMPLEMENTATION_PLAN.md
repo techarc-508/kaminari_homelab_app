@@ -47,6 +47,9 @@ Coroutines/Flow, OkHttp 4.10, org.json, WorkManager (existing delivery only).
   (`file:///home/pushpal/opt/gradle-9.3.1-bin.zip`).
 - Run tests targeted during stages; run the full gate only at Stage F, each task
   separately (the host OOMs when test/build/lint run together).
+- Tests that touch `org.json` or Android APIs run under Robolectric
+  (`@RunWith(RobolectricTestRunner::class)`), matching `NtfyEventParserTest`.
+  Do not let a plain JVM test hit the stubbed `org.json`.
 - Commit per stage with a descriptive message. Never reset/clean.
 
 ## Review Focus
@@ -446,6 +449,10 @@ required; no real executor exists.
       a pass that was not run.
 - [ ] Run the migration test explicitly if it is in `androidTest` and a device
       exists; otherwise record it as unrun.
+- [ ] Attempt a real-server publish round trip only if the origin is healthy.
+      On the 2026-11-08 HTTP 502 blocker, record it as **blocked/unverified**;
+      do not claim it. Contract tests against MockWebServer are the Phase 4
+      evidence.
 - [ ] Inspect `git diff` and `git status`; no unrelated files.
 - [ ] Security review C and independent QA E audit the diff and evidence.
 - [ ] Write `PHASE_4_REPORT.md` with the AGENTS.md §13 template; recommendation

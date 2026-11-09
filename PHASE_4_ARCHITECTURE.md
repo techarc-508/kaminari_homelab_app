@@ -29,6 +29,11 @@ profile model.
 Phase 4 must not weaken Phase 3 delivery ownership, introduce a second stream,
 or add a destructive migration.
 
+**External blocker:** the owner's ntfy origin returned HTTP 502 on 2026-11-08
+(DNS/TLS fine). Phase 4 contract tests therefore use MockWebServer. A real-server
+publish round trip is a release condition, not a Phase 4 coding gate; it cannot
+be claimed until the origin is up and `ntfy version` is pinned.
+
 ## 2. What is reused (do not rebuild)
 
 | Existing component | Reuse |

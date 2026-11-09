@@ -487,6 +487,11 @@ Phase 4 therefore adds a preview dialog before saving:
 
 No automatic data move, merge or deletion. Cross-profile migration is Phase 6.
 
+**Database migration UI:** schema migrations are automatic, forward-only and
+never user-triggered; there is no destructive option to present. The only
+user-facing migration surface is this profile URL-change preview, which shows
+the destination and affected counts before anything changes.
+
 ## 9. UI and navigation
 
 Bottom destinations become the five from `PLAN.md` §2.1:

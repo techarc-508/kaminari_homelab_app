@@ -81,6 +81,18 @@ Phase 3 is accepted as **PASS WITH CONDITIONS**. These conditions are still open
 - [ ] Live gateway/device/validation.
 - [ ] Production signing key setup.
 
+## Phase 8 — Stage 1 final verification (Complete — PASS WITH CONDITIONS)
+
+- [x] Retrospectively audit Phases 5–7.
+- [x] Re-run Android tests (361/0/0/2).
+- [x] Re-run debug build.
+- [x] Re-run lint (0 errors).
+- [x] Re-run gateway tests (9/0).
+- [x] Add Stage 1 controlled integration tests for gateway executor and ntfy admin client.
+- [x] STAGE_1_FINAL_VERIFICATION_REPORT.md.
+- [ ] Live server/device/Boox validation.
+- [ ] Production signing key setup.
+
 ## Phase 7 — release (NOT authorised)
 
 - [ ] Reproducible release signing.

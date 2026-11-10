@@ -113,4 +113,85 @@ class GatewayCommandExecutorTest {
         assertTrue(!outcome.result.ok)
         assertTrue(outcome.result.summary.contains("https://"))
     }
+
+    @Test
+    fun rejectsOversizedResponses() = runBlocking {
+        server.start()
+        server.enqueue(
+            MockResponse()
+                .setResponseCode(200)
+                .setBody("{}".repeat(1_200_000)),
+        )
+
+        val executor = GatewayCommandExecutor(
+            baseUrl = server.url("/").toString().trimEnd('/'),
+            gatewayToken = "token",
+            requireHttps = false,
+        )
+        val envelope = CommandEnvelope(
+            commandId = java.util.UUID.randomUUID().toString(),
+            nonce = "D".repeat(43),
+            issuedAt = System.currentTimeMillis(),
+            expiresAt = System.currentTimeMillis() + 60_000,
+            requestedBy = "android:profile-1",
+            target = "proxmox-gateway",
+            action = "host.health",
+            replyTopic = "rplab-command-results",
+            requiresConfirmation = false,
+        )
+        val outcome = executor.execute(envelope, null)
+        assertTrue(!outcome.result.ok)
+        assertTrue(
+            outcome.result.summary.contains("too large") ||
+            outcome.result.summary.contains("Gateway request failed"),
+        )
+    }
+
+    @Test
+    fun rejectsEmptyGatewayToken() = runBlocking {
+        val executor = GatewayCommandExecutor(
+            baseUrl = "https://example.com",
+            gatewayToken = "",
+            requireHttps = true,
+        )
+        val envelope = CommandEnvelope(
+            commandId = java.util.UUID.randomUUID().toString(),
+            nonce = "E".repeat(43),
+            issuedAt = System.currentTimeMillis(),
+            expiresAt = System.currentTimeMillis() + 60_000,
+            requestedBy = "android:profile-1",
+            target = "proxmox-gateway",
+            action = "host.health",
+            replyTopic = "rplab-command-results",
+            requiresConfirmation = false,
+        )
+        val outcome = executor.execute(envelope, null)
+        assertTrue(!outcome.result.ok)
+        assertTrue(outcome.result.summary.contains("token"))
+    }
+
+    @Test
+    fun reportsGatewayNetworkFailure() = runBlocking {
+        val executor = GatewayCommandExecutor(
+            baseUrl = "https://localhost:1",
+            gatewayToken = "token",
+            connectTimeoutSeconds = 1,
+            readTimeoutSeconds = 1,
+            requireHttps = true,
+        )
+        val envelope = CommandEnvelope(
+            commandId = java.util.UUID.randomUUID().toString(),
+            nonce = "F".repeat(43),
+            issuedAt = System.currentTimeMillis(),
+            expiresAt = System.currentTimeMillis() + 60_000,
+            requestedBy = "android:profile-1",
+            target = "proxmox-gateway",
+            action = "host.health",
+            replyTopic = "rplab-command-results",
+            requiresConfirmation = false,
+        )
+        val outcome = executor.execute(envelope, null)
+        assertTrue(!outcome.result.ok)
+        assertTrue(outcome.result.summary.contains("Gateway request failed"))
+    }
 }

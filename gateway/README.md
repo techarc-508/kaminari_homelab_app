@@ -33,6 +33,7 @@ Use a reverse proxy or uvicorn TLS settings for HTTPS. Do not expose publicly by
 ## Tests
 
 ```bash
+cd gateway
 PYTHONPATH=. python -m pytest -q
 ```
 

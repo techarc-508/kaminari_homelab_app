@@ -5,7 +5,7 @@
 **Branch:** `main`
 **HEAD before Phase 3 checkpoint:** `5d00827` — Phase 2 remediation
 **Phase 3 checkpoint:** `72dbf36`
-**Phase 4:** Stage D complete (integrated Compose UI); Stages E–F require explicit owner approval.
+**Phase 4:** Stage E complete (typed mock Command Centre); Stage F requires explicit owner approval.
 
 ---
 
@@ -17,7 +17,7 @@
 | Phase 1 — architecture and data foundation | Complete, approved | `PHASE_1_REPORT.md`; Room/DataStore/Keystore, demo isolation |
 | Phase 2 — ntfy API correctness | Complete, locally verified; real-server smoke test still valuable | `PHASE_2_REPORT.md`, `PHASE_2_GATE_REPORT.md`; commit `5d00827` |
 | Phase 3 — notification and background delivery | **ACCEPTED — PASS WITH CONDITIONS** (owner, 2026-11-09) | `PHASE_3_REPORT.md`, `PHASE_3_AUDIT_REPORT.md`, `PHASE_3_REMEDIATION_REPORT.md`, `PHASE_3_FINAL_AUDIT.md`, `PHASE_3_ACCEPTANCE.md` |
-| Phase 4 — Compose/activity/command centre | **Stage D complete; Stages E–F pending approval** | `PHASE_4_ARCHITECTURE.md`, `PHASE_4_IMPLEMENTATION_PLAN.md`, `PHASE_4_STAGE_A_REPORT.md`, `PHASE_4_STAGE_B_REPORT.md`, `PHASE_4_STAGE_C_REPORT.md`, `PHASE_4_STAGE_D_REPORT.md` |
+| Phase 4 — Compose/activity/command centre | **Stage E complete; Stage F pending approval** | `PHASE_4_ARCHITECTURE.md`, `PHASE_4_IMPLEMENTATION_PLAN.md`, `PHASE_4_STAGE_A_REPORT.md`, `PHASE_4_STAGE_B_REPORT.md`, `PHASE_4_STAGE_C_REPORT.md`, `PHASE_4_STAGE_D_REPORT.md`, `PHASE_4_STAGE_E_REPORT.md` |
 | Phase 5 — low-end/E-Ink | Not started | Generic E-Ink only until the Boox model/firmware is known |
 | Phase 6 — administration/security | Not started | ntfy admin + separate trusted PVE gateway |
 | Phase 7 — release/QA | Not started | Signed `dist/KaminariNfty-v1.0.0.apk` is the final gate |
@@ -220,6 +220,39 @@ No device/emulator or real-server validation is available. See
 `PHASE_4_STAGE_D_REPORT.md`.
 
 
+## Phase 4 — Stage E (2026-11-10)
+
+**Status: Complete.** Typed mock Command Centre only; Stage F not started.
+
+- Added the `rplab.command.v1` envelope, secure 32-byte URL-safe nonce and
+  five-minute expiry.
+- Added the fixed six-action allowlist and typed argument validation.
+- Added `MockCommandExecutor`: deterministic, in-process, no process/shell/SSH/
+  PVE/network dependency; every result is marked `MOCK`.
+- Added `RoomCommandRepository`: profile-scoped create, confirmation, rejection,
+  expiry, resume, durable execution-start claim, Activity events and retention.
+- Added exact confirmation/rejection/expiry DAO queries and command retention
+  (90 days / 500 terminal rows per profile).
+- Added the seventh `Command` destination and `CommandScreen` with catalogue,
+  typed forms, preview, destructive warning, confirmation, status/expiry,
+  result, history, loading/validation/error/empty states and the mandatory mock
+  banner.
+- Added Activity `COMMANDS` filter and `COMMAND_CONFIRMATION_REQUIRED` /
+  `COMMAND_EXECUTION_STARTED` event types.
+- Added 23 tests: `CommandPolicyTest` 11 and `CommandRepositoryTest` 12.
+
+**Verified (final code):**
+
+```text
+./gradlew testDebugUnitTest --rerun-tasks  # exit 0 — 346 tests, 0 failures, 0 errors, 2 pre-existing skips
+./gradlew assembleDebug                    # exit 0 — app-debug.apk 19,985,395 bytes
+./gradlew lintDebug                        # exit 0 — 0 errors, 56 warnings
+```
+
+No device/emulator or real server is available. See
+`PHASE_4_STAGE_E_REPORT.md`.
+
+
 ## Documentation authority
 
 - `PLAN.md` in the repository root is authoritative; the plan-folder copy is a
@@ -237,8 +270,8 @@ No device/emulator or real-server validation is available. See
   are committed in `93c34d1`; the hygiene fix is `bc6b6cd`; decision cleanup is
   `4140ca0`.
 - Stage A is checkpointed in `db6e77a`; Stage A.1 in `49e3159`; Stage B in
-  `675ec14`; Stage C in `85186f9`; Stage D in `56e68eb` (see
-  `PHASE_4_STAGE_D_REPORT.md`).
+  `675ec14`; Stage C in `85186f9`; Stage D in `56e68eb`; Stage E in
+  `5388c62` (see `PHASE_4_STAGE_E_REPORT.md`).
 - Never reset/clean the repository; do not rewrite history.
 
 ## Next

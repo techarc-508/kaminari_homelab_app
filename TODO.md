@@ -35,8 +35,9 @@ Phase 3 is accepted as **PASS WITH CONDITIONS**. These conditions are still open
 - [x] Stage C: `OutboxRepository` state machine, `ActivityRepository`, receive-event transaction, manual retry, interrupted-send recovery, retention — see `PHASE_4_STAGE_C_REPORT.md`.
 - [x] Owner review of `PHASE_4_STAGE_C_REPORT.md` and approval to start Stage D.
 - [x] Stage D: `PublishViewModel`/`ActivityViewModel`, six-destination navigation, Saved filter, profile switch/preview — see `PHASE_4_STAGE_D_REPORT.md`.
-- [ ] Owner review of `PHASE_4_STAGE_D_REPORT.md` and approval to start Stage E.
-- [ ] Stage E: `rplab.command.v1` envelope, policy, repository, `MockCommandExecutor`, CommandPanel.
+- [x] Owner review of `PHASE_4_STAGE_D_REPORT.md` and approval to start Stage E.
+- [ ] Owner review of `PHASE_4_STAGE_E_REPORT.md` and approval to start Stage F.
+- [x] Stage E: `rplab.command.v1` envelope, policy, repository, `MockCommandExecutor`, CommandPanel — see `PHASE_4_STAGE_E_REPORT.md`.
 - [ ] Stage F: full gate, independent QA, final `PHASE_4_REPORT.md`.
 - [x] Owner authorization of Phase 4 scope (2026-11-09); Stage A only was authorised in that task.
 - [x] Owner acceptance of Stage B and explicit authorization of Stage C (2026-11-10).

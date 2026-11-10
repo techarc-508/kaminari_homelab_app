@@ -1,9 +1,9 @@
 # Phase 4 Report — Compose, Activity and Command Centre
 
-**Status:** Stage D complete. Stages E–F not started.
+**Status:** Stage E complete. Stage F not started.
 **Last updated:** 2026-11-10
 **Owner authorization:** Stage A approved 2026-11-09; Stage B authorised 2026-11-10; Stage C authorised 2026-11-10; Stage D authorised 2026-11-10.
-**Stage A checkpoint:** `db6e77a`. **Stage A.1:** `49e3159`. **Stage B:** `675ec14`. **Stage C:** `85186f9`. **Stage D:** `56e68eb`.
+**Stage A checkpoint:** `db6e77a`. **Stage A.1:** `49e3159`. **Stage B:** `675ec14`. **Stage C:** `85186f9`. **Stage D:** `56e68eb`. **Stage E:** `5388c62`.
 
 This is the living Phase 4 report. Stage A has its own detailed report:
 `PHASE_4_STAGE_A_REPORT.md`; Stage B has `PHASE_4_STAGE_B_REPORT.md`; Stage C has
@@ -20,7 +20,7 @@ stages append here.
 | B | Shared `NtfyAuth`, `PublishValidator`, JSON publish client, MockWebServer contracts | **Complete** |
 | C | `OutboxRepository`, `ActivityRepository`, receive-event transaction, manual retry, recovery, retention | **Complete** |
 | D | Integrated Compose UI: six destinations, Inbox/Topics/Compose/Outbox/Activity/Settings, Saved filter, profile switch/preview | **Complete** |
-| E | `rplab.command.v1` envelope, policy, command repository, `MockCommandExecutor`, CommandPanel | Not started |
+| E | `rplab.command.v1` envelope, policy, command repository, `MockCommandExecutor`, CommandPanel | **Complete** |
 | F | Full gate, independent QA, final Phase 4 report | Not started |
 
 ---
@@ -132,18 +132,15 @@ Full detail: `PHASE_4_STAGE_D_REPORT.md`.
 
 ---
 
-## Verification (2026-11-10)
+## Verification (2026-11-10, Stage E)
 
 ```text
-./gradlew :app:testDebugUnitTest --tests 'com.rplab.kaminarinfty.data.local.*'
-# exit 0 — 36 tests, 0 failures, 0 errors, 0 skipped
-
 ./gradlew testDebugUnitTest --rerun-tasks
-# exit 0 — 323 tests, 0 failures, 0 errors, 2 pre-existing skips
-#   (Stage D adds 37; Stage C added 46; Stage B added 39)
+# exit 0 — 346 tests, 0 failures, 0 errors, 2 pre-existing skips
+#   (Stage E adds 23; Stage D added 37; Stage C added 46; Stage B added 39)
 
 ./gradlew assembleDebug
-# exit 0 — app-debug.apk, 19,950,553 bytes
+# exit 0 — app-debug.apk, 19,985,395 bytes
 
 ./gradlew lintDebug
 # exit 0 — 0 errors, 56 warnings
@@ -175,11 +172,11 @@ Room v2 — neither is hidden with mock behavior.
 
 ## Approval required
 
-**Stage D is complete. Stage E has not started.**
+**Stage E is complete. Stage F has not started.**
 
-Before Stage E:
+Before Stage F:
 
-> Review `PHASE_4_STAGE_D_REPORT.md` and authorise Stage E (`rplab.command.v1`
-> envelope, policy, command repository, `MockCommandExecutor` and CommandPanel).
+> Review `PHASE_4_STAGE_E_REPORT.md` and authorise Stage F (full gate,
+> independent QA, final Phase 4 report).
 
-No Stage E code will be written until that approval is recorded.
+No Stage F code will be written until that approval is recorded.

@@ -77,8 +77,9 @@ Phase 3 is accepted as **PASS WITH CONDITIONS**. These conditions are still open
 - [x] ntfy admin client HTTP timeouts.
 - [x] Security audit report.
 - [x] Integration test report.
-- [ ] Full Android verification in dependency-capable environment.
-- [ ] Live gateway/device validation.
+- [x] Full Android verification (tests 354/0/0/2; debug build OK; lint 0 errors; gateway 9/1).
+- [ ] Live gateway/device/validation.
+- [ ] Production signing key setup.
 
 ## Phase 7 — release (NOT authorised)
 

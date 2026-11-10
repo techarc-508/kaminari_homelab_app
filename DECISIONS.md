@@ -54,6 +54,11 @@ Append-only record of owner decisions and the technical choices that follow from
    (`PHASE_4_ARCHITECTURE.md` §16).
 5. Resolved: Saved remains an Inbox filter (`D-11`).
 6. Phase 6: real allowlisted PVE actions and gateway trust boundary.
+7. Stage 4: whether `https://nfty.rplab.qzz.io` is still the correct reachable
+   production ntfy URL, and whether the Proxmox-host ntfy and the Cloudflare URL
+   are the same endpoint; owner to confirm after the origin is healthy.
+8. Stage 4: which existing topics Kaminari Nfty may reuse for inbox, commands,
+   homelab alerts and admin notices; owner to approve reuse or new topic creation.
 
 ## Documentation reconciliation (2026-11-09)
 

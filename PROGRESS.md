@@ -300,3 +300,32 @@ See `PHASE_4_STAGE_F_REPORT.md`.
    executor and CommandPanel).
 3. Device test matrix in `PHASE_3_REPORT.md` §6 remains owner/hardware-gated.
 4. Real publish/receive smoke test once the ntfy origin is healthy (R-17).
+
+## Phase 8 — Stage 4 ntfy infrastructure discovery and integration (2026-11-10)
+
+**Status: Complete — PASS WITH CONDITIONS.**
+
+- Discovered a running `ntfy serve` on the Proxmox host `pve` (192.168.0.113).
+- The repository default URL `https://nfty.rplab.qzz.io` returned HTTP 502 from
+  the Proxmox host at audit time, so live topic/auth/admin verification was not
+  possible in this stage.
+- Reuse plan produced from repository-described topics plus infrastructure
+  discovery; no new infrastructure created.
+- App integration audit completed; no app-side regression found.
+- Debug APK rebuilt from final committed source and copied to
+  `/home/pushpal/Desktop/KaminariNfty/KaminariNfty-latest-verified.apk`.
+- SHA-256 matched between source APK and Desktop copy.
+
+**Verification:**
+
+```text
+Gateway tests: 9 passed, 1 warning
+Android tests: 361 passed, 0 failures, 0 errors, 2 skipped
+assembleDebug: BUILD SUCCESSFUL
+lintDebug: BUILD SUCCESSFUL, 0 errors
+```
+
+**Deliverables:** NTFY_EXISTING_INFRASTRUCTURE_AUDIT.md, NTFY_TOPIC_REUSE_AND_INTEGRATION_PLAN.md, NTFY_APP_INTEGRATION_AUDIT.md, APK_DESKTOP_DELIVERY_REPORT.md, NTFY_STAGE_4_VALIDATION_REPORT.md.
+
+**Conditions:** live ntfy reachability/topic/ACL/admin verification; production signing key; hardware/Boox validation; live Proxmox validation.
+

@@ -93,6 +93,41 @@ Phase 3 is accepted as **PASS WITH CONDITIONS**. These conditions are still open
 - [ ] Live server/device/Boox validation.
 - [ ] Production signing key setup.
 
+## Phase 8 — Stage 2 release preparation (Complete — PASS WITH CONDITIONS)
+
+- [x] Inspect release configuration.
+- [x] Version/release identity decision.
+- [x] Prepare production build config.
+- [x] Signing readiness and secure owner key generation procedure.
+- [x] APK/release artifact strategy and commands.
+- [x] Release dependency/security review.
+- [x] RELEASE_PREPARATION_REPORT.md, SIGNING_SETUP_GUIDE.md, RELEASE_BUILD_GUIDE.md.
+- [x] Update TODO/PLAN/PROGRESS/CHANGELOG.
+- [ ] Production signing key generated and backed up by owner.
+- [ ] Signed release build verified.
+
+## Phase 8 — Stage 3 gateway deployment package (Complete — PASS WITH CONDITIONS)
+
+- [x] Deployment architecture documented.
+- [x] Production configuration template (.env.example).
+- [x] systemd unit and reverse-proxy example.
+- [x] Gateway security, ACL, deployment, operations, backup/restore docs.
+- [x] Non-deploying validate/health/backup/restore/rotate-token scripts.
+- [x] Controlled validation pass; no infrastructure changed.
+- [ ] Real deployment by owner.
+
+## Phase 8 — Stage 4 ntfy infrastructure discovery & integration (Complete — PASS WITH CONDITIONS)
+
+- [x] Discover existing ntfy infrastructure.
+- [x] NTFY_EXISTING_INFRASTRUCTURE_AUDIT.md.
+- [x] NTFY_TOPIC_REUSE_AND_INTEGRATION_PLAN.md.
+- [x] NTFY_APP_INTEGRATION_AUDIT.md.
+- [x] Rebuild/verify debug APK and copy to Desktop.
+- [x] APK_DESKTOP_DELIVERY_REPORT.md.
+- [x] NTFY_STAGE_4_VALIDATION_REPORT.md.
+- [ ] Live ntfy reachability/topic/ACL/admin verification.
+- [ ] Production signing key setup.
+
 ## Phase 7 — release (NOT authorised)
 
 - [ ] Reproducible release signing.

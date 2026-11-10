@@ -41,6 +41,10 @@ import com.rplab.kaminarinfty.delivery.NftyNotifier
 import com.rplab.kaminarinfty.ui.components.NftyConfirmationSheet
 import com.rplab.kaminarinfty.ui.navigation.NftyBottomNavigationBar
 import com.rplab.kaminarinfty.ui.screens.ActivityScreen
+import com.rplab.kaminarinfty.CommandUiState
+import com.rplab.kaminarinfty.CommandViewModel
+import com.rplab.kaminarinfty.CommandViewModelFactory
+import com.rplab.kaminarinfty.ui.screens.CommandScreen
 import com.rplab.kaminarinfty.ui.screens.InboxScreen
 import com.rplab.kaminarinfty.ui.screens.NotificationDetailScreen
 import com.rplab.kaminarinfty.ui.screens.OutboxScreen
@@ -70,9 +74,12 @@ class MainActivity : ComponentActivity() {
                 viewModel(factory = PublishViewModelFactory(container))
             val activityViewModel: ActivityViewModel =
                 viewModel(factory = ActivityViewModelFactory(container))
+            val commandViewModel: CommandViewModel =
+                viewModel(factory = CommandViewModelFactory(container))
             val uiState by mainViewModel.uiState.collectAsStateWithLifecycle()
             val publishState by publishViewModel.uiState.collectAsStateWithLifecycle()
             val activityState by activityViewModel.uiState.collectAsStateWithLifecycle()
+            val commandState by commandViewModel.uiState.collectAsStateWithLifecycle()
             val context = LocalContext.current
             val notificationsEnabled = rememberNotificationsEnabled()
 
@@ -114,6 +121,8 @@ class MainActivity : ComponentActivity() {
                     publishState = publishState,
                     activityViewModel = activityViewModel,
                     activityState = activityState,
+                    commandViewModel = commandViewModel,
+                    commandState = commandState,
                     isDarkTheme = isDarkTheme,
                     notificationsEnabled = notificationsEnabled,
                     onOpenNotificationSettings = {
@@ -170,6 +179,8 @@ fun KaminariApp(
     publishState: PublishUiState,
     activityViewModel: ActivityViewModel,
     activityState: ActivityUiState,
+    commandViewModel: CommandViewModel,
+    commandState: CommandUiState,
     isDarkTheme: Boolean,
     notificationsEnabled: Boolean,
     onOpenNotificationSettings: () -> Unit,
@@ -201,6 +212,7 @@ fun KaminariApp(
         AppDestination.COMPOSE,
         AppDestination.OUTBOX,
         AppDestination.ACTIVITY,
+        AppDestination.COMMANDS,
         AppDestination.SETTINGS,
     )
     val showBottomBar = uiState.currentDestination in mainDestinations
@@ -354,6 +366,25 @@ fun KaminariApp(
                         isSampleData = uiState.isSampleData,
                         onFilterChange = activityViewModel::setFilter,
                         onSettingsClick = { mainViewModel.navigateTo(AppDestination.SETTINGS) },
+                    )
+                }
+
+                AppDestination.COMMANDS -> {
+                    CommandScreen(
+                        state = commandState,
+                        authState = uiState.authState,
+                        profileLabel = activeProfileName,
+                        isSampleData = uiState.isSampleData,
+                        onSelectAction = commandViewModel::selectAction,
+                        onArgChange = commandViewModel::updateArg,
+                        onSubmit = commandViewModel::submit,
+                        onConfirmationInputChange = commandViewModel::updateConfirmationInput,
+                        onConfirm = commandViewModel::confirmPending,
+                        onReject = commandViewModel::rejectPending,
+                        onCancelConfirmation = commandViewModel::cancelPending,
+                        onClearNotice = commandViewModel::clearNotice,
+                        onSettingsClick = { mainViewModel.navigateTo(AppDestination.SETTINGS) },
+                        onRefresh = commandViewModel::refresh,
                     )
                 }
 

@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.NotificationsNone
@@ -90,6 +91,14 @@ sealed class NavigationItem(
         "nav_activity",
     )
 
+    object Command : NavigationItem(
+        AppDestination.COMMANDS,
+        "Command",
+        Icons.Default.Build,
+        Icons.Default.Build,
+        "nav_command",
+    )
+
     object Settings : NavigationItem(
         AppDestination.SETTINGS,
         "Settings",
@@ -105,6 +114,7 @@ val NavItems = listOf(
     NavigationItem.Compose,
     NavigationItem.Outbox,
     NavigationItem.Activity,
+    NavigationItem.Command,
     NavigationItem.Settings,
 )
 

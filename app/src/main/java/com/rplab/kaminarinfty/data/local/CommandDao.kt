@@ -49,10 +49,57 @@ interface CommandDao {
     ): Int
 
     @Query(
+        "SELECT * FROM command_requests WHERE profileId = :profileId " +
+            "AND status = 'SUBMITTED' AND expiresAt <= :now"
+    )
+    suspend fun getOverdueSubmitted(profileId: String, now: Long): List<CommandRequestEntity>
+
+    @Query(
         "UPDATE command_requests SET status = 'EXPIRED', updatedAt = :now " +
             "WHERE profileId = :profileId AND status = 'SUBMITTED' AND expiresAt < :now"
     )
     suspend fun expireOverdue(profileId: String, now: Long): Int
+
+    /**
+     * Exact-boundary expiry for one request. Unlike [markStatus], this only
+     * moves an unconsumed SUBMITTED row to EXPIRED and never overwrites a result.
+     */
+    @Query(
+        "UPDATE command_requests SET status = 'EXPIRED', updatedAt = :now " +
+            "WHERE profileId = :profileId AND commandId = :commandId " +
+            "AND status = 'SUBMITTED' AND expiresAt <= :now"
+    )
+    suspend fun expireOne(profileId: String, commandId: String, now: Long): Int
+
+    /**
+     * Binds confirmation to this exact profile, command ID and nonce. A second
+     * confirmation, an expired request or a terminal row returns 0.
+     */
+    @Query(
+        "UPDATE command_requests SET confirmedAt = :now, updatedAt = :now " +
+            "WHERE profileId = :profileId AND commandId = :commandId " +
+            "AND nonce = :nonce AND status = 'SUBMITTED' " +
+            "AND requiresConfirmation = 1 AND confirmedAt IS NULL AND expiresAt > :now"
+    )
+    suspend fun confirm(
+        profileId: String,
+        commandId: String,
+        nonce: String,
+        now: Long,
+    ): Int
+
+    /** Explicit rejection is also bound to the exact request and nonce. */
+    @Query(
+        "UPDATE command_requests SET status = 'REJECTED', updatedAt = :now " +
+            "WHERE profileId = :profileId AND commandId = :commandId " +
+            "AND nonce = :nonce AND status = 'SUBMITTED' AND expiresAt > :now"
+    )
+    suspend fun reject(
+        profileId: String,
+        commandId: String,
+        nonce: String,
+        now: Long,
+    ): Int
 
     @Query(
         "DELETE FROM command_requests WHERE profileId = :profileId " +

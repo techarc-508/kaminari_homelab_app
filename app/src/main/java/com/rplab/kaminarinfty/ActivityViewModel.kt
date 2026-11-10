@@ -20,6 +20,7 @@ enum class ActivityFilter(val label: String) {
     ALL("All"),
     PUBLISH("Publish"),
     RECEIVE("Inbox"),
+    COMMANDS("Commands"),
     ATTENTION("Attention"),
 }
 
@@ -36,6 +37,7 @@ data class ActivityUiState(
                 ActivityFilter.ALL -> true
                 ActivityFilter.PUBLISH -> event.type.name.startsWith("PUBLISH_")
                 ActivityFilter.RECEIVE -> event.type == ActivityType.MESSAGE_RECEIVED
+                ActivityFilter.COMMANDS -> event.type.name.startsWith("COMMAND_")
                 ActivityFilter.ATTENTION ->
                     event.severity == ActivitySeverity.WARNING || event.severity == ActivitySeverity.ERROR
             }

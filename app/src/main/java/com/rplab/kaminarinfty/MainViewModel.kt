@@ -42,6 +42,7 @@ enum class AppDestination {
     COMPOSE,
     OUTBOX,
     ACTIVITY,
+    COMMANDS,
     SETTINGS,
     SEARCH,
 }
@@ -923,6 +924,7 @@ class MainViewModel(
                 AppDestination.COMPOSE,
                 AppDestination.OUTBOX,
                 AppDestination.ACTIVITY,
+                AppDestination.COMMANDS,
                 AppDestination.SETTINGS,
                 -> destination
                 else -> current.selectedTab

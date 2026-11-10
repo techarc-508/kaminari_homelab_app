@@ -9,10 +9,15 @@ object RetentionPolicy {
     const val ACTIVITY_MAX_EVENTS_PER_PROFILE = 5_000
     const val OUTBOX_RETENTION_DAYS = 30L
     const val OUTBOX_MAX_TERMINAL_ENTRIES_PER_PROFILE = 500
+    const val COMMAND_RETENTION_DAYS = 90L
+    const val COMMAND_MAX_TERMINAL_ENTRIES_PER_PROFILE = 500
 
     private const val MILLIS_PER_DAY = 24L * 60L * 60L * 1_000L
 
     fun activityCutoff(now: Long): Long = now - ACTIVITY_RETENTION_DAYS * MILLIS_PER_DAY
 
     fun outboxCutoff(now: Long): Long = now - OUTBOX_RETENTION_DAYS * MILLIS_PER_DAY
+
+    /** Terminal command history: 90 days or 500 rows per profile, whichever binds first. */
+    fun commandCutoff(now: Long): Long = now - COMMAND_RETENTION_DAYS * MILLIS_PER_DAY
 }

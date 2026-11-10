@@ -14,6 +14,9 @@ import com.rplab.kaminarinfty.data.repository.NftyRepository
 import com.rplab.kaminarinfty.data.repository.OutboxRepository
 import com.rplab.kaminarinfty.data.repository.ProfileRepository
 import com.rplab.kaminarinfty.data.repository.RoomActivityRepository
+import com.rplab.kaminarinfty.commands.MockCommandExecutor
+import com.rplab.kaminarinfty.data.repository.CommandRepository
+import com.rplab.kaminarinfty.data.repository.RoomCommandRepository
 import com.rplab.kaminarinfty.data.repository.RoomMessageRepository
 import com.rplab.kaminarinfty.data.repository.RoomOutboxRepository
 import com.rplab.kaminarinfty.delivery.AndroidDeliveryController
@@ -41,6 +44,11 @@ class AppContainer(context: Context) {
         profileRepository = profileRepository,
         activityRepository = activityRepository,
         publish = { profileId, request -> streamRepository.publish(profileId, request) },
+    )
+    val commandRepository: CommandRepository = RoomCommandRepository(
+        database = database,
+        activityRepository = activityRepository,
+        executor = MockCommandExecutor(),
     )
     val deliveryController: DeliveryController = AndroidDeliveryController(context)
 

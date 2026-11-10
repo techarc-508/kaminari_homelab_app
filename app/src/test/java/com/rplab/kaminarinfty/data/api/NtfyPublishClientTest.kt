@@ -259,6 +259,16 @@ class NtfyPublishClientTest {
     }
 
     @Test
+    fun `redirects are not followed to avoid duplicate sends`() = runBlocking {
+        server.enqueue(MockResponse().setResponseCode(302).setHeader("Location", "/elsewhere"))
+
+        val result = client.publish(config(), request())
+
+        assertTrue(result is PublishResult.ServerError)
+        assertEquals(1, server.requestCount)
+    }
+
+    @Test
     fun `unreachable server maps to network error`() = runBlocking {
         val config = ServerConfig(
             serverUrl = "http://127.0.0.1:1",

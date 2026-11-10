@@ -56,7 +56,7 @@ interface CommandDao {
 
     @Query(
         "UPDATE command_requests SET status = 'EXPIRED', updatedAt = :now " +
-            "WHERE profileId = :profileId AND status = 'SUBMITTED' AND expiresAt < :now"
+            "WHERE profileId = :profileId AND status = 'SUBMITTED' AND expiresAt <= :now"
     )
     suspend fun expireOverdue(profileId: String, now: Long): Int
 

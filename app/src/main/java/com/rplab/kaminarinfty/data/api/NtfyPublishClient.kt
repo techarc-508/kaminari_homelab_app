@@ -192,6 +192,11 @@ class NtfyPublishClient(
             .readTimeout(15, TimeUnit.SECONDS)
             .writeTimeout(20, TimeUnit.SECONDS)
             .callTimeout(30, TimeUnit.SECONDS)
+            // A hidden redirect or connection retry could replay a publish and
+            // create a duplicate send. Publish retries are explicit and manual.
+            .followRedirects(false)
+            .followSslRedirects(false)
+            .retryOnConnectionFailure(false)
             .build()
     }
 }

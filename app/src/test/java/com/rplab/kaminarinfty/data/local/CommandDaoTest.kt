@@ -181,4 +181,13 @@ class CommandDaoTest {
         )
         assertEquals("SUBMITTED", dao.getById("secondary", "other")!!.status)
     }
+
+    @Test
+    fun `expireOverdue expires at the five minute boundary`() = runTest {
+        seedProfile()
+        dao.insert(command("boundary", expiresAt = 100))
+
+        assertEquals(1, dao.expireOverdue("primary", now = 100))
+        assertEquals("EXPIRED", dao.getById("primary", "boundary")!!.status)
+    }
 }

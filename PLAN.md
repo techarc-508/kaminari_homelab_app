@@ -1,6 +1,6 @@
 # Kaminari Nfty — V1 Product, Architecture & Delivery Plan
 
-**Status:** Living plan — Phase 3 accepted (PASS WITH CONDITIONS); Phase 4 Stage A complete (Room v2), Stages B–F pending owner approval
+**Status:** Living plan — Phase 3 accepted (PASS WITH CONDITIONS); Phase 4 complete (Stages A–F; Stage F PASS WITH CONDITIONS)
 **Target:** First dependable daily-use Android model, not a feature-complete ntfy clone  
 **Platform:** Native Android / Kotlin / Jetpack Compose  
 **Default server URL found in source:** `https://nfty.rplab.qzz.io` (DNS/TLS verified; origin returned HTTP 502 on 2026-11-08 — re-check before live use)
@@ -382,7 +382,7 @@ Status (2026-11-09, remediated): implemented and independently re-audited — se
 
 ### Phase 4 — Compose, activity and command centre
 
-**Status: Stage A complete (2026-11-09) — Stages B–F not started. Owner approval of `PHASE_4_STAGE_A_REPORT.md` is required before Stage B.**
+**Status: Stages A–F complete (2026-11-10). Stage F gate: PASS WITH CONDITIONS.** See `PHASE_4_STAGE_F_REPORT.md`.
 
 Deliver:
 - Inbox/topic UX wired to Room, including unread counts, search and the Saved filter.
@@ -527,7 +527,7 @@ Targets are engineering goals, not promises until measured on real hardware.
 | Phase 1 — architecture and data foundation | Complete, approved | `PHASE_1_REPORT.md`; Room/DataStore/Keystore, demo isolation |
 | Phase 2 — ntfy API correctness | Complete, locally verified; real-server smoke test pending | `PHASE_2_REPORT.md`, `PHASE_2_GATE_REPORT.md`; commit `5d00827` |
 | Phase 3 — notification and background delivery | **ACCEPTED — PASS WITH CONDITIONS** (2026-11-09) | `PHASE_3_REPORT.md`, `PHASE_3_AUDIT_REPORT.md`, `PHASE_3_REMEDIATION_REPORT.md`, `PHASE_3_FINAL_AUDIT.md`, `PHASE_3_ACCEPTANCE.md` |
-| Phase 4 — Compose, activity and command centre | **Stage A complete; Stages B–F pending approval** | `PHASE_4_ARCHITECTURE.md`, `PHASE_4_IMPLEMENTATION_PLAN.md`, `PHASE_4_STAGE_A_REPORT.md` |
+| Phase 4 — Compose, activity and command centre | **Complete (PASS WITH CONDITIONS)** | `PHASE_4_ARCHITECTURE.md`, `PHASE_4_IMPLEMENTATION_PLAN.md`, `PHASE_4_STAGE_A_REPORT.md` … `PHASE_4_STAGE_F_REPORT.md` |
 | Phase 5 — low-end/E-Ink | Not started | Owner decision `D-04`: generic E-Ink until the Boox arrives |
 | Phase 6 — administration/security | Not started | ntfy admin + separate trusted PVE gateway |
 | Phase 7 — release/QA | Not started | Signed `dist/` APK is the final gate |

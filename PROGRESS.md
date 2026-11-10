@@ -5,7 +5,7 @@
 **Branch:** `main`
 **HEAD before Phase 3 checkpoint:** `5d00827` — Phase 2 remediation
 **Phase 3 checkpoint:** `72dbf36`
-**Phase 4:** Stage E complete (typed mock Command Centre); Stage F requires explicit owner approval.
+**Phase 4:** Complete (Stages A–F). Stage F gate: PASS WITH CONDITIONS. Phase 5 not started.
 
 ---
 
@@ -17,7 +17,7 @@
 | Phase 1 — architecture and data foundation | Complete, approved | `PHASE_1_REPORT.md`; Room/DataStore/Keystore, demo isolation |
 | Phase 2 — ntfy API correctness | Complete, locally verified; real-server smoke test still valuable | `PHASE_2_REPORT.md`, `PHASE_2_GATE_REPORT.md`; commit `5d00827` |
 | Phase 3 — notification and background delivery | **ACCEPTED — PASS WITH CONDITIONS** (owner, 2026-11-09) | `PHASE_3_REPORT.md`, `PHASE_3_AUDIT_REPORT.md`, `PHASE_3_REMEDIATION_REPORT.md`, `PHASE_3_FINAL_AUDIT.md`, `PHASE_3_ACCEPTANCE.md` |
-| Phase 4 — Compose/activity/command centre | **Stage E complete; Stage F pending approval** | `PHASE_4_ARCHITECTURE.md`, `PHASE_4_IMPLEMENTATION_PLAN.md`, `PHASE_4_STAGE_A_REPORT.md`, `PHASE_4_STAGE_B_REPORT.md`, `PHASE_4_STAGE_C_REPORT.md`, `PHASE_4_STAGE_D_REPORT.md`, `PHASE_4_STAGE_E_REPORT.md` |
+| Phase 4 — Compose/activity/command centre | **Complete (PASS WITH CONDITIONS)** | `PHASE_4_ARCHITECTURE.md`, `PHASE_4_IMPLEMENTATION_PLAN.md`, `PHASE_4_STAGE_A_REPORT.md`, `PHASE_4_STAGE_B_REPORT.md`, `PHASE_4_STAGE_C_REPORT.md`, `PHASE_4_STAGE_D_REPORT.md`, `PHASE_4_STAGE_E_REPORT.md`, `PHASE_4_STAGE_F_REPORT.md` |
 | Phase 5 — low-end/E-Ink | Not started | Generic E-Ink only until the Boox model/firmware is known |
 | Phase 6 — administration/security | Not started | ntfy admin + separate trusted PVE gateway |
 | Phase 7 — release/QA | Not started | Signed `dist/KaminariNfty-v1.0.0.apk` is the final gate |
@@ -251,6 +251,24 @@ No device/emulator or real-server validation is available. See
 
 No device/emulator or real server is available. See
 `PHASE_4_STAGE_E_REPORT.md`.
+
+
+## Phase 4 — Stage F (2026-11-10)
+
+**Status: Complete — PASS WITH CONDITIONS.** Final integration, security and
+regression gate for Phase 4.
+
+- Consolidated verification: `testDebugUnitTest` 348 tests, 0 failures, 0 errors,
+  2 pre-existing skips; `assembleDebug` 20,105,707 bytes; `lintDebug` 0 errors,
+  56 warnings.
+- Corrective hardening: publish client no longer follows redirects or retries
+  connections; overdue commands expire at the exact five-minute boundary.
+- Regression tests added: redirect non-follow and exact-boundary expiry.
+- Command Centre remains mock-only; no real PVE/SSH/shell/network execution.
+- Real ntfy server, device/emulator, Doze/OEM and hardware Keystore validation
+  remain open (R-17 / hardware matrix).
+
+See `PHASE_4_STAGE_F_REPORT.md`.
 
 
 ## Documentation authority

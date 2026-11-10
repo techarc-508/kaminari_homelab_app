@@ -1,6 +1,6 @@
 # Phase 4 Report — Compose, Activity and Command Centre
 
-**Status:** Stage E complete. Stage F not started.
+**Status:** Stage F complete — PASS WITH CONDITIONS. Phase 4 complete.
 **Last updated:** 2026-11-10
 **Owner authorization:** Stage A approved 2026-11-09; Stage B authorised 2026-11-10; Stage C authorised 2026-11-10; Stage D authorised 2026-11-10.
 **Stage A checkpoint:** `db6e77a`. **Stage A.1:** `49e3159`. **Stage B:** `675ec14`. **Stage C:** `85186f9`. **Stage D:** `56e68eb`. **Stage E:** `5388c62`.
@@ -21,7 +21,7 @@ stages append here.
 | C | `OutboxRepository`, `ActivityRepository`, receive-event transaction, manual retry, recovery, retention | **Complete** |
 | D | Integrated Compose UI: six destinations, Inbox/Topics/Compose/Outbox/Activity/Settings, Saved filter, profile switch/preview | **Complete** |
 | E | `rplab.command.v1` envelope, policy, command repository, `MockCommandExecutor`, CommandPanel | **Complete** |
-| F | Full gate, independent QA, final Phase 4 report | Not started |
+| F | Full gate, independent QA, final Phase 4 report | **Complete** |
 
 ---
 
@@ -170,13 +170,18 @@ Room v2 — neither is hidden with mock behavior.
 
 ---
 
+## Stage F outcome
+
+- Corrective hardening commit: `a0f753c`.
+- Full verification: `testDebugUnitTest` 348 tests / 0 failures / 0 errors /
+  2 pre-existing skips; `assembleDebug` 20,105,707 bytes; `lintDebug` 0 errors /
+  56 warnings.
+- Publish client redirects and connection retries are disabled; overdue commands
+  expire at the exact five-minute boundary.
+- Command Centre remains mock-only. No real PVE, SSH, shell, process, network or
+  gateway execution exists.
+- R-17 and the hardware/server validation matrix remain open.
+
 ## Approval required
 
-**Stage E is complete. Stage F has not started.**
-
-Before Stage F:
-
-> Review `PHASE_4_STAGE_E_REPORT.md` and authorise Stage F (full gate,
-> independent QA, final Phase 4 report).
-
-No Stage F code will be written until that approval is recorded.
+**Phase 4 is complete. Do not start Phase 5 without owner approval.**

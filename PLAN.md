@@ -1,6 +1,6 @@
 # Kaminari Nfty — V1 Product, Architecture & Delivery Plan
 
-**Status:** Living plan — Phase 3 accepted (PASS WITH CONDITIONS); Phase 4 complete (Stages A–F; Stage F PASS WITH CONDITIONS)
+**Status:** Living plan — Phase 3 accepted (PASS WITH CONDITIONS); Phase 4 complete (Stages A–F; Stage F PASS WITH CONDITIONS); Phase 5 complete (PASS WITH CONDITIONS)
 **Target:** First dependable daily-use Android model, not a feature-complete ntfy clone  
 **Platform:** Native Android / Kotlin / Jetpack Compose  
 **Default server URL found in source:** `https://nfty.rplab.qzz.io` (DNS/TLS verified; origin returned HTTP 502 on 2026-11-08 — re-check before live use)

@@ -107,13 +107,15 @@ class MainActivity : ComponentActivity() {
                 }
             }
 
+            val isEink = uiState.themeSetting == ThemeSetting.EINK
             val isDarkTheme = when (uiState.themeSetting) {
                 ThemeSetting.SYSTEM -> isSystemInDarkTheme()
                 ThemeSetting.NIGHT -> true
                 ThemeSetting.DAY -> false
+                ThemeSetting.EINK -> false
             }
 
-            MyApplicationTheme(darkTheme = isDarkTheme) {
+            MyApplicationTheme(darkTheme = isDarkTheme, eink = isEink) {
                 KaminariApp(
                     mainViewModel = mainViewModel,
                     uiState = uiState,

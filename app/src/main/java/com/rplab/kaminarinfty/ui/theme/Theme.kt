@@ -2,6 +2,7 @@ package com.rplab.kaminarinfty.ui.theme
 
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.ui.graphics.Color
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
@@ -44,6 +45,24 @@ private val LightColorScheme = lightColorScheme(
     onError = DaySurfaceMain,
 )
 
+private val EinkColorScheme = lightColorScheme(
+    primary = Color(0xFF000000),
+    onPrimary = Color(0xFFFFFFFF),
+    primaryContainer = Color(0xFFFFFFFF),
+    onPrimaryContainer = Color(0xFF000000),
+    secondary = Color(0xFF000000),
+    onSecondary = Color(0xFFFFFFFF),
+    background = Color(0xFFFFFFFF),
+    onBackground = Color(0xFF000000),
+    surface = Color(0xFFFFFFFF),
+    onSurface = Color(0xFF000000),
+    surfaceVariant = Color(0xFFF2F2F2),
+    onSurfaceVariant = Color(0xFF000000),
+    outline = Color(0xFF000000),
+    error = Color(0xFF000000),
+    onError = Color(0xFFFFFFFF),
+)
+
 private val KaminariNightTokens = KaminariColors(
     background = NightBackground,
     surfaceMain = NightSurfaceMain,
@@ -74,6 +93,21 @@ private val KaminariDayTokens = KaminariColors(
     isDark = false,
 )
 
+private val KaminariEinkTokens = KaminariColors(
+    background = EinkBackground,
+    surfaceMain = EinkSurfaceMain,
+    surfaceSecondary = EinkSurfaceSecondary,
+    surfaceElevated = EinkSurfaceElevated,
+    border = EinkBorder,
+    textPrimary = EinkTextPrimary,
+    textSecondary = EinkTextSecondary,
+    accent = EinkAccent,
+    success = EinkSuccess,
+    warning = EinkWarning,
+    error = EinkError,
+    isDark = false,
+)
+
 object KaminariTheme {
     val colors: KaminariColors
         @Composable
@@ -90,10 +124,19 @@ object KaminariTheme {
 fun MyApplicationTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
     dynamicColor: Boolean = false, // Strictly adhere to Kaminari-Fuji field manual palette
+    eink: Boolean = false,
     content: @Composable () -> Unit,
 ) {
-    val colorScheme = if (darkTheme) DarkColorScheme else LightColorScheme
-    val kaminariTokens = if (darkTheme) KaminariNightTokens else KaminariDayTokens
+    val colorScheme = when {
+        eink -> EinkColorScheme
+        darkTheme -> DarkColorScheme
+        else -> LightColorScheme
+    }
+    val kaminariTokens = when {
+        eink -> KaminariEinkTokens
+        darkTheme -> KaminariNightTokens
+        else -> KaminariDayTokens
+    }
     val techType = TechnicalTypography()
 
     CompositionLocalProvider(

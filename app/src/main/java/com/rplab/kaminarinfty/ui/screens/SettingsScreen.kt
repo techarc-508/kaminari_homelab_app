@@ -17,6 +17,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Contrast
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.BrightnessAuto
 import androidx.compose.material.icons.filled.DarkMode
@@ -368,6 +369,7 @@ fun SettingsScreen(
                                             ThemeSetting.DAY -> Icons.Default.LightMode
                                             ThemeSetting.NIGHT -> Icons.Default.DarkMode
                                             ThemeSetting.SYSTEM -> Icons.Default.BrightnessAuto
+                                            ThemeSetting.EINK -> Icons.Default.Contrast
                                         },
                                         contentDescription = null,
                                         tint = if (isSelected) KaminariTheme.colors.accent else KaminariTheme.colors.textSecondary,
@@ -379,6 +381,7 @@ fun SettingsScreen(
                                             ThemeSetting.DAY -> "Day"
                                             ThemeSetting.NIGHT -> "Night"
                                             ThemeSetting.SYSTEM -> "System"
+                                            ThemeSetting.EINK -> "E-Ink"
                                         },
                                         fontFamily = RubikFontFamily,
                                         fontSize = 11.sp,

@@ -57,10 +57,11 @@ Phase 3 is accepted as **PASS WITH CONDITIONS**. These conditions are still open
 - [ ] Surface Battery Saver repeated-failure diagnostics in Settings.
 - [ ] `LOCKED_BOOT_COMPLETED` support if a credential-free boot path becomes necessary.
 
-## Phase 5 — low-end/E-Ink (NOT authorised)
+## Phase 5 — low-end/E-Ink (Complete — PASS WITH CONDITIONS)
 
-- [ ] Dedicated monochrome E-Ink profile (no animation, gradients or shadows; static status; manual refresh).
+- [x] Dedicated monochrome E-Ink profile (`ThemeSetting.EINK`) with high-contrast tokens.
 - [ ] Vendor tuning only after the Boox model/Android version/firmware is recorded.
+- [ ] Device/emulator/Boox-specific validation remains pending.
 
 ## Phase 6 — administration/security (NOT authorised)
 

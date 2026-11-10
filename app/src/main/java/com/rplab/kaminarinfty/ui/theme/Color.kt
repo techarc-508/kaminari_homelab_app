@@ -40,6 +40,19 @@ val AccentCategoryCyan = Color(0xFF5BB8F5)   // Compute / CPU
 val AccentCategoryGreen = Color(0xFF3DD68C)  // Network / Gateway
 val AccentCategoryPurple = Color(0xFF9E7CFF) // Security / SSL
 
+// E-Ink profile: high-contrast, monochrome, low-visual-noise presentation.
+val EinkBackground = Color(0xFFFFFFFF)
+val EinkSurfaceMain = Color(0xFFFFFFFF)
+val EinkSurfaceSecondary = Color(0xFFF2F2F2)
+val EinkSurfaceElevated = Color(0xFFFFFFFF)
+val EinkBorder = Color(0xFF000000)
+val EinkTextPrimary = Color(0xFF000000)
+val EinkTextSecondary = Color(0xFF333333)
+val EinkAccent = Color(0xFF000000)
+val EinkSuccess = Color(0xFF000000)
+val EinkWarning = Color(0xFF000000)
+val EinkError = Color(0xFF000000)
+
 @Immutable
 data class KaminariColors(
     val background: Color,

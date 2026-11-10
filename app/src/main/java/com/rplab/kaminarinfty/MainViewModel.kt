@@ -71,6 +71,7 @@ enum class ThemeSetting(val label: String) {
     SYSTEM("Follow System"),
     NIGHT("Always Night"),
     DAY("Always Day"),
+    EINK("E-Ink (High Contrast)"),
 }
 
 data class MainUiState(

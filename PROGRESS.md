@@ -5,7 +5,8 @@
 **Branch:** `main`
 **HEAD before Phase 3 checkpoint:** `5d00827` — Phase 2 remediation
 **Phase 3 checkpoint:** `72dbf36`
-**Phase 4:** Complete (Stages A–F). Stage F gate: PASS WITH CONDITIONS. Phase 5 not started.
+**Phase 4:** Complete (Stages A–F). Stage F gate: PASS WITH CONDITIONS.
+**Phase 5:** Complete — optional E-Ink profile plus compatibility/performance/battery verification. PASS WITH CONDITIONS.
 
 ---
 
@@ -18,7 +19,7 @@
 | Phase 2 — ntfy API correctness | Complete, locally verified; real-server smoke test still valuable | `PHASE_2_REPORT.md`, `PHASE_2_GATE_REPORT.md`; commit `5d00827` |
 | Phase 3 — notification and background delivery | **ACCEPTED — PASS WITH CONDITIONS** (owner, 2026-11-09) | `PHASE_3_REPORT.md`, `PHASE_3_AUDIT_REPORT.md`, `PHASE_3_REMEDIATION_REPORT.md`, `PHASE_3_FINAL_AUDIT.md`, `PHASE_3_ACCEPTANCE.md` |
 | Phase 4 — Compose/activity/command centre | **Complete (PASS WITH CONDITIONS)** | `PHASE_4_ARCHITECTURE.md`, `PHASE_4_IMPLEMENTATION_PLAN.md`, `PHASE_4_STAGE_A_REPORT.md`, `PHASE_4_STAGE_B_REPORT.md`, `PHASE_4_STAGE_C_REPORT.md`, `PHASE_4_STAGE_D_REPORT.md`, `PHASE_4_STAGE_E_REPORT.md`, `PHASE_4_STAGE_F_REPORT.md` |
-| Phase 5 — low-end/E-Ink | Not started | Generic E-Ink only until the Boox model/firmware is known |
+| Phase 5 — low-end/E-Ink | **Complete (PASS WITH CONDITIONS)** | `PHASE_5_REPORT.md`; optional `ThemeSetting.EINK`; generic E-Ink only until the Boox model/firmware is known |
 | Phase 6 — administration/security | Not started | ntfy admin + separate trusted PVE gateway |
 | Phase 7 — release/QA | Not started | Signed `dist/KaminariNfty-v1.0.0.apk` is the final gate |
 

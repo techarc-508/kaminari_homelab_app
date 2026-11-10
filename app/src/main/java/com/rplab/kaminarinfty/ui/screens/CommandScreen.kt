@@ -77,7 +77,7 @@ fun CommandScreen(
     ) {
         NftyTopBar(
             title = "Command Centre",
-            subtitle = "MOCK // $profileLabel",
+            subtitle = "${state.backendLabel} // $profileLabel",
             authState = authState,
             isSampleData = isSampleData,
             onSettingsClick = onSettingsClick,

@@ -8,6 +8,8 @@ import org.json.JSONObject
  * review; Phase 4 ships only [MockCommandExecutor].
  */
 interface CommandExecutor {
+    val target: String
+
     suspend fun execute(
         envelope: CommandEnvelope,
         confirmedAt: Long?,
@@ -30,6 +32,8 @@ class MockCommandExecutor(
     private val now: () -> Long = System::currentTimeMillis,
     private val failActions: Set<String> = emptySet(),
 ) : CommandExecutor {
+
+    override val target: String = MOCK_COMMAND_TARGET
 
     override suspend fun execute(
         envelope: CommandEnvelope,

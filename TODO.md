@@ -63,11 +63,12 @@ Phase 3 is accepted as **PASS WITH CONDITIONS**. These conditions are still open
 - [ ] Vendor tuning only after the Boox model/Android version/firmware is recorded.
 - [ ] Device/emulator/Boox-specific validation remains pending.
 
-## Phase 6 — administration/security (NOT authorised)
+## Phase 6 — administration/security (Complete — PASS WITH CONDITIONS)
 
-- [ ] ntfy administration grounded in verified server capabilities.
-- [ ] Separate trusted PVE command gateway with allowlisted actions, independent authorization and audit.
-- [ ] Real executor integration; never embed PVE credentials or arbitrary shell in the APK.
+- [x] ntfy administration client for documented supported operations.
+- [x] Separate trusted PVE gateway with allowlisted actions, authorization and audit.
+- [x] Real gateway executor integration; PVE credentials remain server-side.
+- [ ] Live server/gateway validation pending.
 
 ## Phase 7 — release (NOT authorised)
 

@@ -86,6 +86,7 @@ class RoomCommandRepository(
     private val commandIdGenerator: () -> String = { UUID.randomUUID().toString() },
 ) : CommandRepository {
 
+    private val commandTarget: String = executor.target
     private val commandDao = database.commandDao()
     private val activityDao = database.activityDao()
     private val profileDao = database.serverProfileDao()
@@ -121,7 +122,7 @@ class RoomCommandRepository(
             issuedAt = timestamp,
             expiresAt = timestamp + COMMAND_EXPIRY_MS,
             requestedBy = "android:$profileId",
-            target = MOCK_COMMAND_TARGET,
+            target = commandTarget,
             action = action.id,
             args = normalizedArgs,
             replyTopic = COMMAND_REPLY_TOPIC,
@@ -130,7 +131,7 @@ class RoomCommandRepository(
         val validation = CommandPolicy.validate(
             envelope = envelope,
             nowMillis = timestamp,
-            expectedTarget = MOCK_COMMAND_TARGET,
+            expectedTarget = commandTarget,
             enforceFreshIssue = true,
         )
         if (validation is CommandValidation.Invalid) {

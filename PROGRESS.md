@@ -20,7 +20,7 @@
 | Phase 3 — notification and background delivery | **ACCEPTED — PASS WITH CONDITIONS** (owner, 2026-11-09) | `PHASE_3_REPORT.md`, `PHASE_3_AUDIT_REPORT.md`, `PHASE_3_REMEDIATION_REPORT.md`, `PHASE_3_FINAL_AUDIT.md`, `PHASE_3_ACCEPTANCE.md` |
 | Phase 4 — Compose/activity/command centre | **Complete (PASS WITH CONDITIONS)** | `PHASE_4_ARCHITECTURE.md`, `PHASE_4_IMPLEMENTATION_PLAN.md`, `PHASE_4_STAGE_A_REPORT.md`, `PHASE_4_STAGE_B_REPORT.md`, `PHASE_4_STAGE_C_REPORT.md`, `PHASE_4_STAGE_D_REPORT.md`, `PHASE_4_STAGE_E_REPORT.md`, `PHASE_4_STAGE_F_REPORT.md` |
 | Phase 5 — low-end/E-Ink | **Complete (PASS WITH CONDITIONS)** | `PHASE_5_REPORT.md`; optional `ThemeSetting.EINK`; generic E-Ink only until the Boox model/firmware is known |
-| Phase 6 — administration/security | Not started | ntfy admin + separate trusted PVE gateway |
+| Phase 6 — administration/security | **Complete (PASS WITH CONDITIONS)** | `PHASE_6_REPORT.md`; gateway + Android client; live validation pending |
 | Phase 7 — release/QA | Not started | Signed `dist/KaminariNfty-v1.0.0.apk` is the final gate |
 
 ## Phase 3 acceptance

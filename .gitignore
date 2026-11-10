@@ -19,3 +19,7 @@ local.properties
 debug.keystore
 dist/
 *.jks
+
+# Python
+gateway/**/__pycache__/
+*.pyc

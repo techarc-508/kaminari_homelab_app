@@ -154,7 +154,7 @@ object CommandPolicy {
         if (nowMillis >= envelope.expiresAt) {
             return CommandValidation.Invalid("Command request has expired")
         }
-        if (envelope.target != expectedTarget || envelope.target != MOCK_COMMAND_TARGET) {
+        if (envelope.target != expectedTarget) {
             return CommandValidation.Invalid("Target is not the approved mock target")
         }
         if (!requestedByPattern.matches(envelope.requestedBy)) {

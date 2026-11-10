@@ -18,6 +18,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 data class CommandUiState(
+    val backendLabel: String = "MOCK (no real execution)",
     val activeProfileId: String? = null,
     val actions: List<CommandActionSpec> = CommandCatalog.actions,
     val selectedActionId: String = CommandCatalog.actions.first().id,
@@ -39,9 +40,10 @@ data class CommandUiState(
 class CommandViewModel(
     private val commandRepository: CommandRepository,
     private val profileRepository: ProfileRepository,
+    private val backendLabel: String = "MOCK (no real execution)",
 ) : ViewModel() {
 
-    private val _uiState = MutableStateFlow(CommandUiState())
+    private val _uiState = MutableStateFlow(CommandUiState(backendLabel = backendLabel))
     val uiState: StateFlow<CommandUiState> = _uiState.asStateFlow()
 
     private var commandsJob: Job? = null

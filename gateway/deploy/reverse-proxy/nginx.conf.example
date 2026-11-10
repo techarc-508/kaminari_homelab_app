@@ -1,0 +1,65 @@
+# Kaminari Proxmox Gateway — nginx reverse proxy example
+#
+# This is an example TLS-terminating reverse proxy configuration.
+# It is intentionally not a public-exposure configuration.
+#
+# Assumptions:
+# - The gateway listens locally on 127.0.0.1:8443
+# - TLS certificates are terminated at nginx
+# - The gateway sees requests from localhost
+#
+# Adjust paths, hostnames, and SSL material to the real environment.
+# Do not deploy this as-is.
+
+upstream kaminari_gateway {
+    server 127.0.0.1:8443;
+}
+
+server {
+    listen 443 ssl;
+    server_name kaminari-proxmox-gateway.example;
+
+    ssl_certificate /etc/ssl/certs/kaminari-gateway.pem;
+    ssl_certificate_key /etc/ssl/private/kaminari-gateway-key.pem;
+
+    ssl_session_timeout 1d;
+    ssl_session_cache shared:SSL:10m;
+    ssl_session_tickets off;
+
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers HIGH:!aNULL:!MD5;
+    ssl_prefer_server_ciphers on;
+
+    # Do not log full request bodies. Log enough for operations, not secrets.
+    access_log /var/log/nginx/kaminari-gateway-access.log combined;
+    error_log /var/log/nginx/kaminari-gateway-error.log warn;
+
+    # Optional security headers.
+    add_header Referrer-Policy "no-referrer" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-Frame-Options "SAMEORIGIN" always;
+    add_header Permissions-Policy "geolocation=(), camera=(), microphone=()" always;
+
+    location / {
+        proxy_pass http://kaminari_gateway;
+        proxy_http_version 1.1;
+
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+
+        proxy_set_header Connection "";
+
+        proxy_read_timeout 65s;
+        proxy_send_timeout 65s;
+
+        # Enforce request size at the reverse proxy layer in addition to the
+        # gateway's own limit, as a defense-in-depth measure.
+        client_max_body_size 64k;
+    }
+
+    # Operational endpoints: keep them reachable through the same TLS
+    # termination, authenticated through the gateway token just like the rest
+    # of the API. Do not expose them as unauthenticated public endpoints.
+}

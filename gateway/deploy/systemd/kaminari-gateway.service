@@ -1,0 +1,56 @@
+[Unit]
+Description=Kaminari Proxmox Gateway
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+# Replace with the real service user/group created during install.
+User=kaminari-gateway
+Group=kaminari-gateway
+
+WorkingDirectory=/opt/kaminari-gateway
+
+# The gateway reads its configuration from a git-ignored .env file or
+# environment files attached to the unit. Point EnvironmentFile at the
+# deployed config path, not at the example template.
+EnvironmentFile=/etc/kaminari-gateway/.env
+
+ExecStart=/opt/kaminari-gateway/.venv/bin/uvicorn \
+    app.main:app \
+    --host 127.0.0.1 \
+    --port 8443 \
+    --proxy-headers \
+    --log-level info \
+    --timeout-keep-alive 65
+
+# Restart behavior: restart on failure with a short backoff. This avoids
+# restarting too aggressively on repeated misconfiguration or dependency
+# startup problems.
+Restart=on-failure
+RestartSec=5
+
+# Graceful shutdown: allow active requests to finish briefly, then stop.
+TimeoutStopSec=30
+
+# Resource limits: keep the service small by default.
+LimitNOFILE=4096
+LimitNPROC=256
+
+# Security hardening for a dedicated service account.
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+ReadWritePaths=/opt/kaminari-gateway/logs
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+
+# Audit and journal-friendly logging: log to stdout so journald can capture it.
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=kaminari-gateway
+
+[Install]
+WantedBy=multi-user.target

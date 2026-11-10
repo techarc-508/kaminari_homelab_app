@@ -21,6 +21,7 @@ class GatewayCommandExecutor(
     private val requireHttps: Boolean = true,
     private val connectTimeoutSeconds: Long = 10,
     private val readTimeoutSeconds: Long = 20,
+    private val maxResponseBytes: Long = 1_048_576,
     private val client: OkHttpClient = OkHttpClient.Builder()
         .connectTimeout(10, TimeUnit.SECONDS)
         .readTimeout(20, TimeUnit.SECONDS)
@@ -66,7 +67,14 @@ class GatewayCommandExecutor(
 
         return try {
             client.newCall(request).execute().use { response ->
+                val contentLength = response.body?.contentLength() ?: -1L
+                if (contentLength > maxResponseBytes) {
+                    return failure("Gateway response was too large")
+                }
                 val raw = response.body?.string().orEmpty()
+                if (raw.length.toLong() > maxResponseBytes) {
+                    return failure("Gateway response was too large")
+                }
                 if (!response.isSuccessful) {
                     return failure("Gateway returned HTTP ${response.code}: ${safeMessage(raw)}")
                 }

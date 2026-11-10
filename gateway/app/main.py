@@ -1,4 +1,5 @@
 import logging
+import re
 import time
 from typing import Any, Dict
 
@@ -15,6 +16,22 @@ from .commands import (
 from .config import Settings
 from .models import CommandExecuteRequest, ErrorResponse
 from .proxmox import ProxmoxClient
+
+NODE_PATTERN = re.compile(r"^[a-z0-9][a-z0-9_-]{0,31}$")
+VMID_PATTERN = re.compile(r"^[0-9]{1,10}$")
+
+
+def validate_node(node: str) -> str:
+    if not NODE_PATTERN.fullmatch(node):
+        raise HTTPException(status_code=400, detail="Invalid node")
+    return node
+
+
+def validate_vmid(vmid: int) -> int:
+    if not VMID_PATTERN.fullmatch(str(vmid)):
+        raise HTTPException(status_code=400, detail="Invalid vmid")
+    return vmid
+
 
 settings = Settings()
 logger = logging.getLogger("kaminari-gateway")
@@ -76,28 +93,34 @@ async def nodes(token: str = Depends(authenticate)) -> Any:
 
 @app.get("/v1/proxmox/qemu")
 async def qemu(node: str, token: str = Depends(authenticate)) -> Any:
+    validate_node(node)
     return await proxmox.get(f"/nodes/{node}/qemu")
 
 
 @app.get("/v1/proxmox/lxc")
 async def lxc(node: str, token: str = Depends(authenticate)) -> Any:
+    validate_node(node)
     return await proxmox.get(f"/nodes/{node}/lxc")
 
 
 @app.get("/v1/proxmox/status")
 async def status(node: str, kind: str, vmid: int, token: str = Depends(authenticate)) -> Any:
+    validate_node(node)
     if kind not in {"qemu", "lxc"}:
         raise HTTPException(status_code=400, detail="kind must be qemu or lxc")
+    validate_vmid(vmid)
     return await proxmox.get(f"/nodes/{node}/{kind}/{vmid}/status/current")
 
 
 @app.get("/v1/proxmox/storage")
 async def storage(node: str, token: str = Depends(authenticate)) -> Any:
+    validate_node(node)
     return await proxmox.get(f"/nodes/{node}/storage")
 
 
 @app.get("/v1/proxmox/tasks")
 async def tasks(node: str, token: str = Depends(authenticate)) -> Any:
+    validate_node(node)
     return await proxmox.get(f"/nodes/{node}/tasks")
 
 

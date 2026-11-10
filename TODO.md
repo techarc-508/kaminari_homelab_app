@@ -70,6 +70,16 @@ Phase 3 is accepted as **PASS WITH CONDITIONS**. These conditions are still open
 - [x] Real gateway executor integration; PVE credentials remain server-side.
 - [ ] Live server/gateway validation pending.
 
+## Phase 7 — integration hardening (Complete — PASS WITH CONDITIONS)
+
+- [x] Gateway path parameter validation.
+- [x] Android gateway response size limit.
+- [x] ntfy admin client HTTP timeouts.
+- [x] Security audit report.
+- [x] Integration test report.
+- [ ] Full Android verification in dependency-capable environment.
+- [ ] Live gateway/device validation.
+
 ## Phase 7 — release (NOT authorised)
 
 - [ ] Reproducible release signing.

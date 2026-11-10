@@ -1,5 +1,6 @@
 # Kaminari Nfty — Changelog
 
+
 Format: `date · phase/commit · fact` (append-only).
 
 - 2026-11-08 · audit · READ-ONLY audit delivered: `AUDIT_REPORT.md`, `CURRENT_ARCHITECTURE.md`, `API_CAPABILITY_MATRIX.md`, `PHASE_0_EXECUTION_PLAN.md`; `ctx_note #2` decision trace completed with `OWNER_DECISION_REVIEW.md`.
@@ -27,3 +28,4 @@ Format: `date · phase/commit · fact` (append-only).
 - 2026-11-10 · phase-4-stage-f · **Phase 4 final integration and regression gate complete (PASS WITH CONDITIONS).** Corrective hardening: disabled publish redirects/connection retries and fixed command expiry boundary. Added 2 regression tests. Verified: `testDebugUnitTest` 348 tests / 0 failures / 2 pre-existing skips; `assembleDebug` 20,105,707 B; `lintDebug` 0 errors / 56 warnings. Real server/hardware validation remains open. Stage F checkpoint: `a0f753c`. See `PHASE_4_STAGE_F_REPORT.md`.
 - 2026-11-10 · phase-5 · **Optional E-Ink presentation profile implemented.**
 - 2026-11-10 · phase-6 · **Secure administration and Proxmox gateway added.** Added `gateway/` FastAPI service (read-only Proxmox endpoints, typed command execution, mutation guard, replay/rate/size limits), `GatewayCommandExecutor`, `NtfyAdminClient`, backend label in Command Centre. Tests: gateway 9; Android 354. Build/lint pass. Live server/hardware validation pending. See `PHASE_6_REPORT.md`. Added `ThemeSetting.EINK`, high-contrast E-Ink palette/tokens, `MyApplicationTheme(eink = ...)`, Settings selector option, and MainActivity mapping. No Room migration, new messaging feature, binary upload, release signing, deployment, or real PVE/SSH/shell/network execution. Verified: `testDebugUnitTest --rerun-tasks` 348 tests / 0 failures / 2 pre-existing skips; `assembleDebug --rerun-tasks` success; `lintDebug --rerun-tasks` 0 errors / 56 warnings. Hardware/Boox-specific validation remains pending. See `PHASE_5_REPORT.md`.
+- 2026-11-10 · phase-7 · Integration hardening: gateway node/VMID path validation, Android gateway response size limit, ntfy admin client HTTP timeouts, security audit and integration reports. Gateway tests 9 passed. Android full verification blocked by offline Gradle dependency resolution in this environment.

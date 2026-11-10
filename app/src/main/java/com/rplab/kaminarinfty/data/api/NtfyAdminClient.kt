@@ -1,6 +1,7 @@
 package com.rplab.kaminarinfty.data.api
 
 import java.io.IOException
+import java.util.concurrent.TimeUnit
 import okhttp3.Credentials
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
@@ -18,7 +19,11 @@ import org.json.JSONObject
 class NtfyAdminClient(
     private val baseUrl: String,
     private val requireHttps: Boolean = true,
-    private val client: OkHttpClient = OkHttpClient(),
+    private val client: OkHttpClient = OkHttpClient.Builder()
+        .connectTimeout(10, TimeUnit.SECONDS)
+        .readTimeout(20, TimeUnit.SECONDS)
+        .writeTimeout(20, TimeUnit.SECONDS)
+        .build(),
 ) {
 
     data class NtfyUser(

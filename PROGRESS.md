@@ -329,3 +329,35 @@ lintDebug: BUILD SUCCESSFUL, 0 errors
 
 **Conditions:** live ntfy reachability/topic/ACL/admin verification; production signing key; hardware/Boox validation; live Proxmox validation.
 
+## Phase 8 — Stage 4.1 final APK and configuration verification (2026-11-10)
+
+**Status: Complete — PASS WITH CONDITIONS.**
+
+- Confirmed `HEAD = d04d9b4`, clean working tree, Stage 4 changed docs only.
+- Android tests 361/0/0/2; gateway tests 9 passed; `assembleDebug` successful;
+  `lintDebug` 0 errors.
+- APK identity from this source: applicationId `com.rplab.kaminarinfty`, versionName `1.0`,
+  versionCode `1`, DEBUG-SIGNED, NOT PRODUCTION-SIGNED.
+- Verified APK copied to `/home/pushpal/Desktop/KaminariNfty/KaminariNfty-latest-verified.apk`;
+  SHA-256 `a3d29f0557b0f247e6246439d1346bc2396f26c9c8a8178f6f955f2dea3b17ac`,
+  size 19918197 bytes, source and Desktop copies match.
+- Hostname findings: the repository currently references `https://nfty.rplab.qzz.io`;
+  `https://ntfy.rplab.qzz.io` has no occurrences. Live confirmation of the correct
+  canonical production hostname remains an owner item.
+
+**Verification:**
+
+```text
+./gradlew test --no-daemon --rerun-tasks           # 361/0/0/2
+gateway tests (PYTHONPATH=. python3 -m pytest -q) # 9 passed, 1 warning
+./gradlew assembleDebug --no-daemon --rerun-tasks  # BUILD SUCCESSFUL
+./gradlew lintDebug --no-daemon --rerun-tasks     # BUILD SUCCESSFUL, 0 errors
+SHA256 source APK == SHA256 Desktop copy           # MATCH
+```
+
+**Deliverables:** `STAGE_4_1_FINAL_VERIFICATION_REPORT.md`, plus updates to `TODO.md` and `PROGRESS.md`.
+
+**Conditions:** owner confirmation of canonical production ntfy hostname; live ntfy
+reachability/topic/ACL/admin verification; production signing key; hardware/Boox
+validation; live Proxmox validation.
+

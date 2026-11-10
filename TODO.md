@@ -128,6 +128,19 @@ Phase 3 is accepted as **PASS WITH CONDITIONS**. These conditions are still open
 - [ ] Live ntfy reachability/topic/ACL/admin verification.
 - [ ] Production signing key setup.
 
+## Phase 8 — Stage 4.1 final APK and configuration verification (Complete — PASS WITH CONDITIONS)
+
+- [x] Confirm HEAD and working tree.
+- [x] Run Android tests (361/0/0/2) and gateway tests (9/0).
+- [x] Rebuild/verify debug APK.
+- [x] Inspect package, versionName, versionCode, signing.
+- [x] Copy verified APK to Desktop and SHA-256-match.
+- [x] Report hostname findings.
+- [x] STAGE_4_1_FINAL_VERIFICATION_REPORT.md.
+- [ ] Owner confirms canonical production ntfy hostname.
+- [ ] Live ntfy reachability/topic/ACL/admin verification.
+- [ ] Production signing key setup.
+
 ## Phase 7 — release (NOT authorised)
 
 - [ ] Reproducible release signing.

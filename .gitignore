@@ -19,6 +19,11 @@ local.properties
 debug.keystore
 dist/
 *.jks
+release.properties
+local.properties.release
+*.properties
+!.env.example
+!.gitignore
 
 # Python
 gateway/**/__pycache__/

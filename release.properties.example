@@ -1,0 +1,25 @@
+# Production release signing configuration template.
+#
+# Copy this file to a name that is git-ignored, for example:
+#   release.properties            (ignored only if added to .gitignore)
+#   ~/.config/kaminarinfty/release.properties   (outside the repository)
+#
+# Then fill in the real values. Do not commit real passwords or keystore paths.
+#
+# The release signing config in app/build.gradle.kts reads from:
+#   1. Environment variables - highest priority
+#      KEYSTORE_PATH, STORE_PASSWORD, KEY_PASSWORD
+#   2. Gradle project properties - read from -P flags or from this file when
+#      loaded explicitly by the owner before building.
+#      releaseKeystorePath, releaseStorePassword, releaseKeyPassword
+#
+# Required values:
+releaseKeystorePath=/absolute/path/to/my-upload-key.jks
+releaseStorePassword=REPLACE_WITH_ACTUAL_STORE_PASSWORD
+releaseKeyPassword=REPLACE_WITH_ACTUAL_KEY_PASSWORD
+
+# Optional owner notes:
+# - Keep the keystore and this file separate from the repository.
+# - Back up the keystore and these passwords securely and separately.
+# - Losing the production key means losing the ability to publish updates to the
+#   same app identity on the Play Store / installed devices.

@@ -406,3 +406,18 @@ SHA256 app/build/outputs/apk/release/app-release.apk == 98276170c654c646472e32cd
 live ntfy reachability/topic/ACL/admin verification; production signing key; hardware/Boox
 validation; live Proxmox validation.
 
+
+## Final infrastructure and publication pass — 2026-11-11
+
+- Restored the complete 48-commit project history after the branch had been reset to the remote skeleton; merged the remote README history without force-push.
+- Recovered and verified the real repository state: 255 tracked files, Room v2, 361 Android tests / 2 skips, 9 gateway tests.
+- Sanitized unpublished Stage 5 documentation containing literal test-signing passwords; rebuilt the unpublished local commits before publication. Remote history untouched.
+- Live ntfy audit: canonical `https://ntfy.rplab.qzz.io`, ntfy 2.28.0 in Docker on CT 104 (`docker-stack`), volume `utilities_ntfy_data`, auth disabled; old `nfty` hostname is 502.
+- Verified production topic `KAMINARI-FUJI-Homelab` (PVE webhook, watchtower, docker-events); created and tested dedicated `kaminari-onboarding-test`.
+- Provisioned PVE least-privilege identity `kaminari-gateway@pve!gateway-ro` with privilege separation and `KaminariRead` (`Datastore.Audit`, `Sys.Audit`, `VM.Audit`); verified `/version`, `/nodes`, `/qemu`, `/lxc`, `/status` 200. No mutation privilege.
+- No new CT/VM; gateway remains undeployed.
+- Added full documentation library, live audit/topology/topic docs, security report, owner onboarding guide and device checklist.
+- Built final debug and test-only release APKs; copied both to Desktop and verified SHA-256.
+- Public GitHub publication and final hashes are recorded in `STAGE_6_PUBLICATION_AND_DOCUMENTATION_REPORT.md` and `FINAL_APK_DELIVERY_REPORT.md`.
+
+**Open:** physical-device validation, production signing, gateway deployment, ntfy auth/token enablement.

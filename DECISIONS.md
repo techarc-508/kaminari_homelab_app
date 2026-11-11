@@ -70,3 +70,14 @@ Append-only record of owner decisions and the technical choices that follow from
 - The handoff's phase-scope wording conflated Phase 4 with E-Ink and
   administration. `PLAN.md` is authoritative: E-Ink is Phase 5, ntfy admin and
   the PVE gateway are Phase 6.
+
+## Final infrastructure decisions (2026-11-11)
+
+| ID | Decision | Reason |
+|---|---|---|
+| D-12 | Canonical ntfy URL is `https://ntfy.rplab.qzz.io`; `nfty` is obsolete and returns 502. | Live DNS/TLS/health evidence from Mint and PVE. |
+| D-13 | Use Guest/Anonymous in the app while ntfy auth is disabled; do not create an admin token. | `users=0`, `enable_login=false`; no token exists; app must not hold admin. |
+| D-14 | PVE gateway identity is `kaminari-gateway@pve!gateway-ro` with privilege separation and `KaminariRead`. | Least privilege; verified read-only API. No mutation privilege. |
+| D-15 | Release APK is signed with a test-only key, not a production key. | Owner instruction; production key remains a separate decision. |
+| D-16 | Do not deploy a new CT/VM or expose the gateway publicly. | Owner boundary; no always-on private host chosen yet. |
+| D-17 | Keep `KAMINARI-FUJI-Homelab` read-only; use `kaminari-onboarding-test` for tests. | Production alerts must not be polluted. |

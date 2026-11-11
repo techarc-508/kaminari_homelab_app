@@ -79,7 +79,7 @@ Phase 3 is accepted as **PASS WITH CONDITIONS**. These conditions are still open
 - [x] Integration test report.
 - [x] Full Android verification (tests 354/0/0/2; debug build OK; lint 0 errors; gateway 9/1).
 - [ ] Live gateway/device/validation.
-- [ ] Production signing key setup.
+- [ ] Production signing key setup (test-only release key in use).
 
 ## Phase 8 — Stage 1 final verification (Complete — PASS WITH CONDITIONS)
 
@@ -91,7 +91,7 @@ Phase 3 is accepted as **PASS WITH CONDITIONS**. These conditions are still open
 - [x] Add Stage 1 controlled integration tests for gateway executor and ntfy admin client.
 - [x] STAGE_1_FINAL_VERIFICATION_REPORT.md.
 - [ ] Live server/device/Boox validation.
-- [ ] Production signing key setup.
+- [ ] Production signing key setup (test-only release key in use).
 
 ## Phase 8 — Stage 2 release preparation (Complete — PASS WITH CONDITIONS)
 
@@ -125,8 +125,8 @@ Phase 3 is accepted as **PASS WITH CONDITIONS**. These conditions are still open
 - [x] Rebuild/verify debug APK and copy to Desktop.
 - [x] APK_DESKTOP_DELIVERY_REPORT.md.
 - [x] NTFY_STAGE_4_VALIDATION_REPORT.md.
-- [ ] Live ntfy reachability/topic/ACL/admin verification.
-- [ ] Production signing key setup.
+- [x] Live ntfy reachability/topic verification: health 200; `KAMINARI-FUJI-Homelab` + `kaminari-onboarding-test`; auth disabled, no admin/ACL.
+- [ ] Production signing key setup (test-only release key in use).
 
 ## Phase 8 — Stage 4.1 final APK and configuration verification (Complete — PASS WITH CONDITIONS)
 
@@ -137,9 +137,9 @@ Phase 3 is accepted as **PASS WITH CONDITIONS**. These conditions are still open
 - [x] Copy verified APK to Desktop and SHA-256-match.
 - [x] Report hostname findings.
 - [x] STAGE_4_1_FINAL_VERIFICATION_REPORT.md.
-- [ ] Owner confirms canonical production ntfy hostname.
-- [ ] Live ntfy reachability/topic/ACL/admin verification.
-- [ ] Production signing key setup.
+- [x] Owner confirms canonical production ntfy hostname: `https://ntfy.rplab.qzz.io` (old `nfty` is 502).
+- [x] Live ntfy reachability/topic verification: health 200; `KAMINARI-FUJI-Homelab` + `kaminari-onboarding-test`; auth disabled, no admin/ACL.
+- [ ] Production signing key setup (test-only release key in use).
 
 ## Phase 8 — Stage 5 release engineering and publication preparation (Complete — PASS WITH CONDITIONS)
 
@@ -157,10 +157,24 @@ Phase 3 is accepted as **PASS WITH CONDITIONS**. These conditions are still open
 - [x] Document tool limitation: VM lacked `apksigner`/`aapt2`/`apktool`; `keytool -printcert -jarfile` reported `Not a signed jar file`, so full signature verification still depends on `apksigner` on a machine with Android SDK build tools.
 - [x] Staged two target Desktop APKs: `/home/pushpal/Desktop/KaminariNfty/KaminariNfty-debug.apk` (debug) and `/home/pushpal/Desktop/KaminariNfty/KaminariNfty_final_release.apk` (test-only signed release); both SHA-256-matched to `app/build/outputs/apk/*/app-*-apk`.
 - [ ] Owner installs and tests `KaminariNfty-debug.apk` and `KaminariNfty_final_release.apk` on physical devices; both test variant paths must be run, not skipped.
-- [ ] Live ntfy reachability/topic/ACL/admin verification.
-- [ ] Production signing key setup.
+- [x] Live ntfy reachability/topic verification: health 200; `KAMINARI-FUJI-Homelab` + `kaminari-onboarding-test`; auth disabled, no admin/ACL.
+- [ ] Production signing key setup (test-only release key in use).
 
 ## Phase 7 — release (NOT authorised)
 
 - [ ] Reproducible release signing.
 - [ ] Final validation, `dist/KaminariNfty-v1.0.0.apk`, checksums, release notes.
+
+## Final pass — 2026-11-11
+
+- [x] Restore full project history and merge remote README without force-push.
+- [x] Sanitize unpublished test-signing passwords; gitleaks history/tree 0 findings.
+- [x] Live ntfy audit and canonical URL.
+- [x] PVE least-privilege `kaminari-gateway@pve!gateway-ro` token + ACL.
+- [x] Documentation library, owner guide, device checklist.
+- [x] Final debug and test-only release APKs copied to Desktop with checksums.
+- [x] Public GitHub publication.
+- [ ] Physical device tests (`OWNER_DEVICE_TESTING_CHECKLIST.md`).
+- [ ] Production signing key.
+- [ ] Gateway deployment/TLS.
+- [ ] ntfy authentication enablement and app token.

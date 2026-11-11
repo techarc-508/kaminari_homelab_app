@@ -157,7 +157,7 @@ data class TechnicalTypography(
         lineHeight = 13.sp,
         letterSpacing = 0.6.sp,
     ),
-    // Endpoint URL and search shortcut hints: e.g. "https://nfty.rplab.qzz.io", "[/]"
+    // Endpoint URL and search shortcut hints: e.g. "https://ntfy.rplab.qzz.io", "[/]"
     val endpointUrl: TextStyle = TextStyle(
         fontFamily = JetBrainsMonoFontFamily,
         fontWeight = FontWeight.Normal,

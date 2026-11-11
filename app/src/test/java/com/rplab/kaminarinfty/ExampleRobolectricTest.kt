@@ -27,7 +27,7 @@ class ExampleRobolectricTest {
   @Test
   fun `server config defaults to correct endpoint`() {
     val config = ServerConfig()
-    assertEquals("https://nfty.rplab.qzz.io", config.serverUrl)
+    assertEquals("https://ntfy.rplab.qzz.io", config.serverUrl)
     assertEquals(AuthMethod.GUEST, config.authMethod)
     assertTrue(config.useHttpsOnly)
   }

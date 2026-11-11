@@ -41,7 +41,7 @@ fun NftyErrorState(
     modifier: Modifier = Modifier,
 ) {
     val description = customMessage ?: when (errorCategory) {
-        NftyErrorCategory.DNS -> "Unable to resolve hostname 'nfty.rplab.qzz.io'. Check network connectivity or local DNS settings."
+        NftyErrorCategory.DNS -> "Unable to resolve hostname 'ntfy.rplab.qzz.io'. Check network connectivity or local DNS settings."
         NftyErrorCategory.TLS -> "TLS handshake verification failed. The endpoint certificate could not be validated safely."
         NftyErrorCategory.AUTH -> "Provided credentials were not accepted by the ntfy server. Check username or access token."
         NftyErrorCategory.FORBIDDEN -> "Server policy denies access to this topic or action. Privileges must be granted server-side."

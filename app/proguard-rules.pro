@@ -1,4 +1,9 @@
-# Add project specific ProGuard rules here.
+# OkHttp references optional TLS providers that are not bundled on Android.
+# They are only used when the app is embedded in a JVM with those providers.
+-dontwarn org.bouncycastle.**
+-dontwarn org.conscrypt.**
+-dontwarn org.openjsse.**
+
 # You can control the set of applied configuration files using the
 # proguardFiles setting in build.gradle.
 #

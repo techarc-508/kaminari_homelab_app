@@ -23,7 +23,7 @@ enum class AuthState(val statusLabel: String, val isConnected: Boolean) {
 }
 
 data class ServerConfig(
-    val serverUrl: String = "https://nfty.rplab.qzz.io",
+    val serverUrl: String = "https://ntfy.rplab.qzz.io",
     val authMethod: AuthMethod = AuthMethod.GUEST,
     val username: String = "",
     val tokenOrPassword: String = "",

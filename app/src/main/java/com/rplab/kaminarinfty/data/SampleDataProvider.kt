@@ -75,9 +75,9 @@ object SampleDataProvider {
                 message = "Main AC line power lost on rack-node-01. Switching to battery inverter. Estimated runtime: 34 minutes at 240W draw.",
                 priority = NftyPriority.URGENT,
                 tags = listOf("warning", "power", "ups", "hardware"),
-                click = "https://nfty.rplab.qzz.io/ups-diagnostics",
+                click = "https://ntfy.rplab.qzz.io/ups-diagnostics",
                 actions = listOf(
-                    NftyAction("act_view", "view", "Inspect UPS Telemetry", "https://nfty.rplab.qzz.io/ups-diagnostics")
+                    NftyAction("act_view", "view", "Inspect UPS Telemetry", "https://ntfy.rplab.qzz.io/ups-diagnostics")
                 ),
                 isRead = false,
                 isSaved = true,
@@ -105,7 +105,7 @@ object SampleDataProvider {
                 tags = listOf("floppy_disk", "backup", "postgres", "verified"),
                 attachment = NftyAttachment(
                     name = "backup-report-20261015.json",
-                    url = "https://nfty.rplab.qzz.io/reports/backup-20261015.json",
+                    url = "https://ntfy.rplab.qzz.io/reports/backup-20261015.json",
                     type = "application/json",
                     size = 4280,
                 ),
@@ -133,7 +133,7 @@ object SampleDataProvider {
                 message = "Build target arm64/v8 finished with zero errors. Image deployed to local registry: hub.rplab.internal/kaminari:2.4.1.",
                 priority = NftyPriority.LOW,
                 tags = listOf("white_check_mark", "docker", "ci-cd"),
-                click = "https://nfty.rplab.qzz.io/builds/481",
+                click = "https://ntfy.rplab.qzz.io/builds/481",
                 isRead = true,
                 isSaved = false,
                 isSample = true,

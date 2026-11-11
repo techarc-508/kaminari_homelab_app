@@ -46,7 +46,7 @@ import java.util.Locale
 @Composable
 fun NftyTopBar(
     title: String = "KAMINARI-FUJI",
-    subtitle: String = "ntfy node • nfty.rplab.qzz.io",
+    subtitle: String = "ntfy node • ntfy.rplab.qzz.io",
     authState: AuthState = AuthState.GUEST,
     isSampleData: Boolean = false,
     showBackButton: Boolean = false,

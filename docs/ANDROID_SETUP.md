@@ -47,7 +47,7 @@ Use **Settings → server profiles** to create additional profiles. Each profile
 
 ## LAN note
 
-The app enforces HTTPS by default. `http://192.168.0.104:8201` works from `curl` on the LAN but is rejected by the app’s HTTPS enforcement and by Android’s default cleartext policy. Use the public HTTPS URL for the app.
+The app enforces HTTPS by default. `http://<private-ntfy-lan>:8201` works from `curl` on the LAN but is rejected by the app’s HTTPS enforcement and by Android’s default cleartext policy. Use the public HTTPS URL for the app.
 
 ## Permissions
 

@@ -15,9 +15,9 @@ Do not enable mutations unless there is a documented operational need.
 
 Create a user dedicated to the gateway, for example:
 
-pveum useradd kaminari-gateway@pve --password REALLY_STRONG_PASSWORD
+pveum useradd <gateway-user>@pve --password REALLY_STRONG_PASSWORD
 
-If your environment uses a different realm, adjust `kaminari-gateway@pve`
+If your environment uses a different realm, adjust `<gateway-user>@pve`
 accordingly. Keep the realm consistent with the rest of your Proxmox identity
 setup.
 
@@ -28,7 +28,7 @@ interactive login.
 
 Create an API token for the gateway:
 
-pveum api-token create kaminari-gateway@pve --purpose kaminari-gateway \
+pveum api-token create <gateway-user>@pve --purpose kaminari-gateway \
   --token-id kaminari-gateway-token
 
 The output includes `username` and `token`. The full API token string has the
@@ -54,7 +54,7 @@ pveum aclmod / -group kaminari-gateway-readonly -role PVEAuditor
 
 or, if you prefer a user-level ACL with a more constrained custom role:
 
-pveum aclmod / -user kaminari-gateway@pve -role kaminari-gateway-ro
+pveum aclmod / -user <gateway-user>@pve -role kaminari-<token-id>
 
 If you create a custom role, include only the following kinds of read access:
 
@@ -73,8 +73,8 @@ Do not grant write, stop, start, or migration permissions in the read-only role.
 If the gateway should only access specific nodes, scope the ACL to those nodes
 instead of the root `/`. For example:
 
-pveum aclmod /nodes/NODE1 -user kaminari-gateway@pve -role kaminari-gateway-ro
-pveum aclmod /nodes/NODE2 -user kaminari-gateway@pve -role kaminari-gateway-ro
+pveum aclmod /nodes/NODE1 -user <gateway-user>@pve -role kaminari-<token-id>
+pveum aclmod /nodes/NODE2 -user <gateway-user>@pve -role kaminari-<token-id>
 
 If the gateway does not need access to every node, do not grant it cluster-wide
 access.

@@ -170,7 +170,7 @@ Phase 3 is accepted as **PASS WITH CONDITIONS**. These conditions are still open
 - [x] Restore full project history and merge remote README without force-push.
 - [x] Sanitize unpublished test-signing passwords; gitleaks history/tree 0 findings.
 - [x] Live ntfy audit and canonical URL.
-- [x] PVE least-privilege `kaminari-gateway@pve!gateway-ro` token + ACL.
+- [x] PVE least-privilege `<gateway-user>@pve!<token-id>` token + ACL.
 - [x] Documentation library, owner guide, device checklist.
 - [x] Final debug and test-only release APKs copied to Desktop with checksums.
 - [x] Public GitHub publication.

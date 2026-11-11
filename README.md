@@ -34,13 +34,13 @@ The live self-hosted server was audited on 2026-11-11:
 |---|---|
 | Canonical public URL | `https://ntfy.rplab.qzz.io` |
 | Old/mistyped URL | `https://nfty.rplab.qzz.io` — returns HTTP 502; do not use |
-| Server | ntfy **2.28.0**, Docker container `ntfy` on CT 104 (`docker-stack`) |
+| Server | ntfy **2.28.0**, Docker container `ntfy` on the Docker LXC (`the Docker LXC`) |
 | Health | `200 {"healthy":true}` from the Mint VM and from Proxmox |
 | Authentication | **Disabled** (`users=0`, `enable_login=false`); use Guest mode |
 | Existing production topic | `KAMINARI-FUJI-Homelab` (PVE, watchtower, docker-events) — read-only from the app |
 | Dedicated test topic | `kaminari-onboarding-test` |
 
-The public hostname works; the LAN origin is `http://192.168.0.104:8201` for other clients, but the Android app enforces HTTPS by default.
+The public hostname works; the LAN origin is `http://<private-ntfy-lan>:8201` for other clients, but the Android app enforces HTTPS by default.
 
 ## Screens
 
@@ -148,7 +148,7 @@ Owner-only live-access documents are kept outside Git at `~/.config/kaminari-nif
 
 - Credentials are encrypted with an Android Keystore-backed key; only the encrypted envelope is stored.
 - No token, password, PVE secret or signing key is in the APK, source, docs or Git history.
-- The public app identity is non-admin; the PVE gateway uses a dedicated read-only `kaminari-gateway@pve` token with `KaminariRead` and privilege separation.
+- The public app identity is non-admin; the PVE gateway uses a dedicated read-only `<gateway-user>@pve` token with `KaminariRead` and privilege separation.
 - The gateway has no mutation permission; `GATEWAY_MUTATIONS_ENABLED` stays `false`.
 - The Android Command Centre uses a mock executor and never sends shell, SSH or Proxmox commands.
 - Release signing is test-only; rotate it before production distribution.

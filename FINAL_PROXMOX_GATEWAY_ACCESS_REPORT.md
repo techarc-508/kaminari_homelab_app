@@ -8,15 +8,15 @@ Date: 2026-11-11 UTC.
 |---|---|
 | PVE version | 9.2.11 |
 | Node | `pve` |
-| API | `https://192.168.0.113:8006/api2/json` |
+| API | `https://<private-pve-host>:8006/api2/json` |
 | Guests | 1 QEMU, 5 LXC |
 
 ## Service identity
 
 | Item | Value |
 |---|---|
-| Account | `kaminari-gateway@pve` |
-| Token | `gateway-ro` |
+| Account | `<gateway-user>@pve` |
+| Token | `<token-id>` |
 | Privilege separation | enabled |
 | Role | `KaminariRead` (custom, read-only) |
 | Privileges | `Datastore.Audit`, `Sys.Audit`, `VM.Audit` |
@@ -53,8 +53,8 @@ Deployment requires:
 ## Revocation
 
 ```bash
-pveum user token remove kaminari-gateway@pve gateway-ro
-pveum user delete kaminari-gateway@pve
+pveum user token remove <gateway-user>@pve <token-id>
+pveum user delete <gateway-user>@pve
 ```
 
 Backup before change: `/root/kaminari-user.cfg.backup-20261111T111543Z`.

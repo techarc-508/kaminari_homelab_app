@@ -35,5 +35,5 @@ Severity reflects user impact; state reflects what is verified.
 | R-27 | **Live ntfy is unauthenticated.** Anyone with a topic name can read or publish. | High | Open owner decision. Enable auth only after updating PVE webhook, watchtower and docker-events; do not default-deny blindly. |
 | R-28 | **Gateway is not deployed.** Real Proxmox views/commands are unavailable from the app. | Medium | Documented; least-privilege token ready. Deploy on an existing private host with TLS. |
 | R-29 | **Release is test-only signed.** Not a production/Play Store identity. | Medium | Accepted for owner evaluation; generate a production key before distribution. |
-| R-30 | **LAN HTTP origin is unusable by the app.** `http://192.168.0.104:8201` is CLI-only because the app enforces HTTPS and Android denies cleartext. | Low | Use the public HTTPS URL; do not weaken TLS for LAN convenience. |
+| R-30 | **LAN HTTP origin is unusable by the app.** `http://<private-ntfy-lan>:8201` is CLI-only because the app enforces HTTPS and Android denies cleartext. | Low | Use the public HTTPS URL; do not weaken TLS for LAN convenience. |
 | R-31 | **Old `nfty` hostname returns 502.** Cached configs may still point at it. | Medium | Use `ntfy.rplab.qzz.io`; update any remaining client configs. |

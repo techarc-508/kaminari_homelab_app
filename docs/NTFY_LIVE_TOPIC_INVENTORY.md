@@ -17,11 +17,11 @@ Date: 2026-11-11 UTC. This is an evidence-based inventory, not a claim that ever
 | Required permission | Read (currently anonymous) |
 | Conflict/risk | Publishing test data here would pollute production alerts |
 
-Evidence paths on CT 104/PVE:
+Evidence paths on the Docker LXC/PVE:
 
-- `/etc/pve/notifications.cfg` → webhook target `kaminari-ntfy`, URL `http://192.168.0.104:8201/KAMINARI-FUJI-Homelab`
+- `/etc/pve/notifications.cfg` → webhook target `kaminari-ntfy`, URL `http://<private-ntfy-lan>:8201/KAMINARI-FUJI-Homelab`
 - `/opt/stack/utilities/docker-compose.ops.yml:131` → `WATCHTOWER_NOTIFICATION_URL: ntfy://ntfy.rplab.qzz.io/KAMINARI-FUJI-Homelab`
-- `/opt/stack/kaminari-events/events.sh:7` and `/opt/stack/kaminari-fuji/tools/kaminari-events/events.sh:7` → `NTFY_URL="http://192.168.0.104:8201/KAMINARI-FUJI-Homelab"`
+- `/opt/stack/kaminari-events/events.sh:7` and `/opt/stack/kaminari-fuji/tools/kaminari-events/events.sh:7` → `NTFY_URL="http://<private-ntfy-lan>:8201/KAMINARI-FUJI-Homelab"`
 
 ### `kaminari-onboarding-test`
 

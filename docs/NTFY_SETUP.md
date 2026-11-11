@@ -15,12 +15,12 @@ Internet
 Cloudflare (ntfy.rplab.qzz.io)
   │
   ▼
-CT 103 — cloudflared tunnel
+the cloudflared LXC — cloudflared tunnel
   │
   ▼
-CT 104 — docker-stack, container "ntfy"
+the Docker LXC — the Docker LXC, container "ntfy"
   │  image: binwiederhier/ntfy, ntfy 2.28.0
-  │  published port: 192.168.0.104:8201 -> container :80
+  │  published port: <private-ntfy-lan>:8201 -> container :80
   ▼
 Docker volume utilities_ntfy_data -> /var/lib/ntfy
 ```

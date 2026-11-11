@@ -15,7 +15,7 @@ delivering the verified APK to the VM Desktop, and documenting everything.
 
 ### 2.1 What was found
 - A ntfy process `ntfy serve` is running on the Proxmox host `pve`
-  (192.168.0.113).
+  (<private-pve-host>).
 - The repository references the public URL `https://nfty.rplab.qzz.io` as the
   default ntfy endpoint.
 - DNS for `nfty.rplab.qzz.io` resolves to Cloudflare addresses

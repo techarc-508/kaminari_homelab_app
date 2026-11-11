@@ -305,7 +305,7 @@ See `PHASE_4_STAGE_F_REPORT.md`.
 
 **Status: Complete — PASS WITH CONDITIONS.**
 
-- Discovered a running `ntfy serve` on the Proxmox host `pve` (192.168.0.113).
+- Discovered a running `ntfy serve` on the Proxmox host `pve` (<private-pve-host>).
 - The repository default URL `https://nfty.rplab.qzz.io` returned HTTP 502 from
   the Proxmox host at audit time, so live topic/auth/admin verification was not
   possible in this stage.
@@ -412,9 +412,9 @@ validation; live Proxmox validation.
 - Restored the complete 48-commit project history after the branch had been reset to the remote skeleton; merged the remote README history without force-push.
 - Recovered and verified the real repository state: 255 tracked files, Room v2, 361 Android tests / 2 skips, 9 gateway tests.
 - Sanitized unpublished Stage 5 documentation containing literal test-signing passwords; rebuilt the unpublished local commits before publication. Remote history untouched.
-- Live ntfy audit: canonical `https://ntfy.rplab.qzz.io`, ntfy 2.28.0 in Docker on CT 104 (`docker-stack`), volume `utilities_ntfy_data`, auth disabled; old `nfty` hostname is 502.
+- Live ntfy audit: canonical `https://ntfy.rplab.qzz.io`, ntfy 2.28.0 in Docker on the Docker LXC (`the Docker LXC`), volume `utilities_ntfy_data`, auth disabled; old `nfty` hostname is 502.
 - Verified production topic `KAMINARI-FUJI-Homelab` (PVE webhook, watchtower, docker-events); created and tested dedicated `kaminari-onboarding-test`.
-- Provisioned PVE least-privilege identity `kaminari-gateway@pve!gateway-ro` with privilege separation and `KaminariRead` (`Datastore.Audit`, `Sys.Audit`, `VM.Audit`); verified `/version`, `/nodes`, `/qemu`, `/lxc`, `/status` 200. No mutation privilege.
+- Provisioned PVE least-privilege identity `<gateway-user>@pve!<token-id>` with privilege separation and `KaminariRead` (`Datastore.Audit`, `Sys.Audit`, `VM.Audit`); verified `/version`, `/nodes`, `/qemu`, `/lxc`, `/status` 200. No mutation privilege.
 - No new CT/VM; gateway remains undeployed.
 - Added full documentation library, live audit/topology/topic docs, security report, owner onboarding guide and device checklist.
 - Built final debug and test-only release APKs; copied both to Desktop and verified SHA-256.

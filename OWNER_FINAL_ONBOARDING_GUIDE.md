@@ -102,7 +102,7 @@ A real Proxmox read-only view or future approved command execution would need th
 
 ## 18. Configure the gateway (later)
 
-Read `docs/GATEWAY_DEPLOYMENT.md`. Use an existing always-on host, HTTPS/private network, `GATEWAY_MUTATIONS_ENABLED=false`, the `kaminari-gateway@pve!gateway-ro` token, and the PVE CA certificate. Never put the token in the APK.
+Read `docs/GATEWAY_DEPLOYMENT.md`. Use an existing always-on host, HTTPS/private network, `GATEWAY_MUTATIONS_ENABLED=false`, the `<gateway-user>@pve!<token-id>` token, and the PVE CA certificate. Never put the token in the APK.
 
 ## 19. Troubleshooting
 

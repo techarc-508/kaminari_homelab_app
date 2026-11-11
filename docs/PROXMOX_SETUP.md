@@ -4,7 +4,7 @@
 
 - Proxmox VE **9.2.11**
 - Node `pve`
-- API: `https://192.168.0.113:8006/api2/json`
+- API: `https://<private-pve-host>:8006/api2/json`
 - Guests observed: 1 QEMU, 5 LXC
 
 ## Least-privilege gateway identity
@@ -13,8 +13,8 @@ Created on 2026-11-11:
 
 | Item | Value |
 |---|---|
-| Account | `kaminari-gateway@pve` |
-| Token ID | `gateway-ro` |
+| Account | `<gateway-user>@pve` |
+| Token ID | `<token-id>` |
 | Privilege separation | enabled (`privsep=1`) |
 | ACL | `KaminariRead` on `/` |
 | Role privileges | `Datastore.Audit`, `Sys.Audit`, `VM.Audit` |
@@ -40,8 +40,8 @@ The token secret is stored only in `~/.config/kaminari-nifty/PVE_GATEWAY_PRIVATE
 ## Revocation
 
 ```bash
-pveum user token remove kaminari-gateway@pve gateway-ro
-pveum user delete kaminari-gateway@pve
+pveum user token remove <gateway-user>@pve <token-id>
+pveum user delete <gateway-user>@pve
 ```
 
 Backup before change: `/root/kaminari-user.cfg.backup-20261111T111543Z` on the PVE host.

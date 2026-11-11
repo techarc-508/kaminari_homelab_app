@@ -9,8 +9,8 @@ Date: 2026-11-11 UTC.
 | URL | `https://ntfy.rplab.qzz.io` |
 | Server | ntfy 2.28.0 |
 | Health | `200 {"healthy":true}` from Mint VM and PVE |
-| DNS/TLS | valid public certificate; Cloudflare in front of cloudflared CT 103 |
-| LAN origin | `http://192.168.0.104:8201` (CLI only) |
+| DNS/TLS | valid public certificate; Cloudflare in front of cloudflared the cloudflared LXC |
+| LAN origin | `http://<private-ntfy-lan>:8201` (CLI only) |
 | Old URL | `https://nfty.rplab.qzz.io` → HTTP 502; not used |
 
 ## Authentication and token

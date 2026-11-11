@@ -7,7 +7,7 @@ That hostname is not the canonical endpoint. Use `https://ntfy.rplab.qzz.io`. Th
 ## Health works in `curl` but the app fails
 
 - The app enforces HTTPS by default.
-- `http://192.168.0.104:8201` is a LAN origin for CLI clients; the app rejects plaintext HTTP and Android denies cleartext by default.
+- `http://<private-ntfy-lan>:8201` is a LAN origin for CLI clients; the app rejects plaintext HTTP and Android denies cleartext by default.
 - Use the public HTTPS URL. Check certificate validity and DNS from the phone.
 
 ## `401`/`403`
@@ -44,7 +44,7 @@ This VM’s JVM cannot TCP-connect to `services.gradle.org` even though `curl` w
 
 - Verify `GATEWAY_PROXMOX_BASE_URL` is HTTPS.
 - Install the PVE CA certificate for `GATEWAY_PROXMOX_VERIFY_TLS=true`.
-- Confirm the `kaminari-gateway@pve!gateway-ro` token is enabled and has `KaminariRead` on `/`.
+- Confirm the `<gateway-user>@pve!<token-id>` token is enabled and has `KaminariRead` on `/`.
 - Do not disable TLS verification as a quick fix.
 
 ## Secret scan reports a test fixture

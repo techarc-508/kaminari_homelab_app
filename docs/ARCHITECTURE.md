@@ -67,4 +67,4 @@ SENDING (orphaned by process death) ──recovery──▶ AMBIGUOUS
 
 ## Proxmox boundary
 
-The APK never holds Proxmox credentials. The optional FastAPI gateway holds a dedicated `kaminari-gateway@pve` token with `KaminariRead` (audit) permissions and privilege separation. Mutations are disabled by default and require a separate owner decision and server-side policy.
+The APK never holds Proxmox credentials. The optional FastAPI gateway holds a dedicated `<gateway-user>@pve` token with `KaminariRead` (audit) permissions and privilege separation. Mutations are disabled by default and require a separate owner decision and server-side policy.

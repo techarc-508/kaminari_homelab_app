@@ -10,7 +10,7 @@
 - Mock-only Command Centre; no shell/SSH/PVE execution.
 - Separate FastAPI gateway with read-only Proxmox routes and mutation guard.
 - Live ntfy audited: canonical `https://ntfy.rplab.qzz.io`, ntfy 2.28.0, health 200, auth disabled.
-- PVE least-privilege identity: `kaminari-gateway@pve!gateway-ro`, `KaminariRead`, read-only API verified.
+- PVE least-privilege identity: `<gateway-user>@pve!<token-id>`, `KaminariRead`, read-only API verified.
 - Public GitHub repository with full history and documentation.
 - Debug and test-only signed release APKs on the Desktop, checksum-verified.
 - Public repository: https://github.com/techarc-508/kaminari_homelab_app (branch `main`; history reconciliation and scan in `STAGE_6_PUBLICATION_AND_DOCUMENTATION_REPORT.md`).

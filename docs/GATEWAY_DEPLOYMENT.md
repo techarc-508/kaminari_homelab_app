@@ -20,8 +20,8 @@ The gateway is a separate FastAPI service in `gateway/`. It is **not** part of t
 
 ```bash
 GATEWAY_GATEWAY_TOKEN=<long-random-token>
-GATEWAY_PROXMOX_BASE_URL=https://192.168.0.113:8006/api2/json
-GATEWAY_PROXMOX_API_TOKEN=kaminari-gateway@pve!gateway-ro=<secret>
+GATEWAY_PROXMOX_BASE_URL=https://<private-pve-host>:8006/api2/json
+GATEWAY_PROXMOX_API_TOKEN=<gateway-user>@pve!<token-id>=<secret>
 GATEWAY_PROXMOX_VERIFY_TLS=true
 GATEWAY_MUTATIONS_ENABLED=false
 ```
@@ -42,7 +42,7 @@ python3 -m venv .venv
 . .venv/bin/activate
 pip install -r requirements.txt
 export GATEWAY_GATEWAY_TOKEN=...   # from private file
-export GATEWAY_PROXMOX_BASE_URL=https://192.168.0.113:8006/api2/json
+export GATEWAY_PROXMOX_BASE_URL=https://<private-pve-host>:8006/api2/json
 export GATEWAY_PROXMOX_API_TOKEN=... # from private file
 export GATEWAY_MUTATIONS_ENABLED=false
 uvicorn app.main:app --host 127.0.0.1 --port 8443

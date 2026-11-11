@@ -6,24 +6,24 @@ Date: 2026-11-11 UTC. Scope: Proxmox VE host, existing ntfy deployment, network 
 
 | Area | Verdict | Evidence |
 |---|---|---|
-| Existing ntfy server | **Operational** | ntfy 2.28.0 Docker container on CT 104; health 200 |
+| Existing ntfy server | **Operational** | ntfy 2.28.0 Docker container on the Docker LXC; health 200 |
 | Canonical public URL | **Verified** | `https://ntfy.rplab.qzz.io` (200 from Mint and PVE) |
 | Old documented URL | **Broken** | `https://nfty.rplab.qzz.io` → Cloudflare 502 |
 | Authentication | **Disabled** | `/v1/config` `enable_login=false`; `users=0` |
 | Production topic | **Verified** | `KAMINARI-FUJI-Homelab`, 3 producers |
 | Test topic | **Verified** | `kaminari-onboarding-test`; publish/read-back succeeded |
 | PVE | **Operational** | PVE 9.2.11, node `pve` |
-| Gateway identity | **Provisioned and verified** | `kaminari-gateway@pve!gateway-ro`, `KaminariRead`, read-only API 200s |
+| Gateway identity | **Provisioned and verified** | `<gateway-user>@pve!<token-id>`, `KaminariRead`, read-only API 200s |
 | Gateway service | **Not deployed** | No new CT/VM; deployment prerequisite documented |
 
 ## What was inspected
 
-- Docker container `ntfy` (`binwiederhier/ntfy`) on CT 104, volume `utilities_ntfy_data`.
-- Published port `192.168.0.104:8201`; container IP `172.19.0.4:80`.
+- Docker container `ntfy` (`binwiederhier/ntfy`) on the Docker LXC, volume `utilities_ntfy_data`.
+- Published port `<private-ntfy-lan>:8201`; container IP `<container-ip>:80`.
 - No host systemd unit; Docker restart policy `unless-stopped`.
 - `ntfy 2.28.0`; defaults; no `server.yml` auth file; environment contains only `PATH`.
 - `/v1/config` and `/v1/health`; server stats (`users=0`, `messages_published=628`, `messages_cached=35`).
-- Cloudflare → cloudflared CT 103 → CT 104 path.
+- Cloudflare → cloudflared the cloudflared LXC → the Docker LXC path.
 - Producer configs: PVE webhook, watchtower, `kaminari-docker-events`.
 - PVE 9.2.11, node `pve`, guests: 1 QEMU, 5 LXC.
 - PVE users/tokens/ACL before and after the authorized change.

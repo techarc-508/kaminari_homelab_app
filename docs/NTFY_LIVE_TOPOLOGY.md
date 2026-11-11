@@ -8,13 +8,13 @@ Phone / Mint VM / PVE
 Cloudflare DNS + TLS
         │
         ▼
-cloudflared on CT 103
+cloudflared on the cloudflared LXC
         │  private tunnel
         ▼
-CT 104 (docker-stack)
-  Docker network 172.19.0.0/16
-  container ntfy → 172.19.0.4:80
-  published LAN: 192.168.0.104:8201
+the Docker LXC (the Docker LXC)
+  Docker network <docker-subnet>
+  container ntfy → <container-ip>:80
+  published LAN: <private-ntfy-lan>:8201
         │
         ▼
 ntfy 2.28.0 (defaults, auth disabled)
@@ -39,12 +39,12 @@ The two names are not interchangeable. The typo remains in older documentation a
 | Path | URL | Status |
 |---|---|---|
 | Public / remote | `https://ntfy.rplab.qzz.io` | verified 200 |
-| LAN / CLI | `http://192.168.0.104:8201` | verified 200 from the Mint VM |
+| LAN / CLI | `http://<private-ntfy-lan>:8201` | verified 200 from the Mint VM |
 | Android app | `https://ntfy.rplab.qzz.io` | recommended; HTTPS enforced |
-| PVE producers | `http://192.168.0.104:8201/KAMINARI-FUJI-Homelab` | verified config; not changed |
+| PVE producers | `http://<private-ntfy-lan>:8201/KAMINARI-FUJI-Homelab` | verified config; not changed |
 
 The app deliberately enforces HTTPS and does not opt into Android cleartext traffic, so the LAN HTTP origin is for CLI/producer use, not the phone.
 
 ## Proxmox and gateway
 
-PVE API is `https://192.168.0.113:8006/api2/json`. The gateway is separate and is not deployed. The gateway identity is read-only and never embedded in the app. No new CT/VM was created for this work.
+PVE API is `https://<private-pve-host>:8006/api2/json`. The gateway is separate and is not deployed. The gateway identity is read-only and never embedded in the app. No new CT/VM was created for this work.

@@ -21,6 +21,6 @@ Notable verified facts:
 - Gateway tests: **9 passed**.
 - Lint: **0 errors / 56 warnings**.
 - Live ntfy: `https://ntfy.rplab.qzz.io`, version 2.28.0, health 200.
-- PVE: 9.2.11, read-only `kaminari-gateway@pve!gateway-ro` token verified against `/version`, `/nodes`, `/qemu`, `/lxc`, `/status`.
+- PVE: 9.2.11, read-only `<gateway-user>@pve!<token-id>` token verified against `/version`, `/nodes`, `/qemu`, `/lxc`, `/status`.
 
 The original audit found the prototype was not buildable and had no persistence or notifications; those gaps were closed in later phases. Earlier reports remain available for traceability.

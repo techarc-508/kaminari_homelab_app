@@ -10,7 +10,7 @@ This stage discovered the existing ntfy infrastructure in the RPLab homelab and
 evaluated whether the existing instance can be reused by Kaminari Nfty.
 
 The key finding is that there is a running ntfy instance on the Proxmox host
-(`pve`, 192.168.0.113), but the well-known public URL
+(`pve`, <private-pve-host>), but the well-known public URL
 `https://nfty.rplab.qzz.io` returned `502` from the Proxmox host at audit time,
 and the public endpoint could not be verified as the same ntfy instance from
 this machine.
@@ -26,10 +26,10 @@ So:
 
 | Item | Value | Source | Notes |
 |------|-------|--------|-------|
-| Proxmox host | `pve`, 192.168.0.113 | RPLAB_ACCESS.md + SSH | Verified reachable over SSH from this VM with key |
+| Proxmox host | `pve`, <private-pve-host> | RPLAB_ACCESS.md + SSH | Verified reachable over SSH from this VM with key |
 | Linux Mint VM | inside Proxmox | RPLAB_ACCESS.md | Known desktop VM used for this work |
 | ntfy host process | on `pve` | live SSH inspection | `ntfy serve` running as pid 8671 |
-| ct104 | 192.168.0.104 | RPLAB_ACCESS.md | Not reachable from this SSH session via the key copied to pve for this audit; direct root@192.168.0.104 access did not succeed in this run |
+| ct104 | <private-ntfy-lan> | RPLAB_ACCESS.md | Not reachable from this SSH session via the key copied to pve for this audit; direct root@<private-ntfy-lan> access did not succeed in this run |
 
 ## 3. ntfy instance discovery
 

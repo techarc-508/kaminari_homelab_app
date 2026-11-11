@@ -36,8 +36,8 @@ The app is a client for a self-hosted ntfy server. It must assume:
 
 ## Proxmox least privilege
 
-- Dedicated service account `kaminari-gateway@pve`.
-- Token `gateway-ro` with privilege separation.
+- Dedicated service account `<gateway-user>@pve`.
+- Token `<token-id>` with privilege separation.
 - ACL `KaminariRead` on `/` (audit only).
 - No power, configuration, user or storage mutation privilege.
 - Token secret only in the owner-private file; not in the APK, source, docs or Git.

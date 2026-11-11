@@ -141,6 +141,25 @@ Phase 3 is accepted as **PASS WITH CONDITIONS**. These conditions are still open
 - [ ] Live ntfy reachability/topic/ACL/admin verification.
 - [ ] Production signing key setup.
 
+## Phase 8 — Stage 5 release engineering and publication preparation (Complete — PASS WITH CONDITIONS)
+
+- [x] Inspect current release config, signing, backup, data-extraction, and network security posture.
+- [x] R8/minification review.
+- [x] Android backup and data-extraction policy review.
+- [x] Network security review.
+- [x] Release signing final guide.
+- [x] Release build validation.
+- [x] Stage 5 report, `R8_MINIFICATION_REVIEW.md`, `ANDROID_BACKUP_AND_DATA_EXTRACTION_POLICY.md`, `NETWORK_SECURITY_REVIEW.md`, `RELEASE_SIGNING_FINAL_GUIDE.md`, `RELEASE_BUILD_VALIDATION.md`.
+- [x] Re-run Android tests and gateway tests.
+- [x] Rebuild debug APK.
+- [x] Produce test-only signed release APK for owner local install testing.
+- [x] Confirm package `com.rplab.kaminarinfty` from binary manifest.
+- [x] Document tool limitation: VM lacked `apksigner`/`aapt2`/`apktool`; `keytool -printcert -jarfile` reported `Not a signed jar file`, so full signature verification still depends on `apksigner` on a machine with Android SDK build tools.
+- [x] Staged two target Desktop APKs: `/home/pushpal/Desktop/KaminariNfty/KaminariNfty-debug.apk` (debug) and `/home/pushpal/Desktop/KaminariNfty/KaminariNfty_final_release.apk` (test-only signed release); both SHA-256-matched to `app/build/outputs/apk/*/app-*-apk`.
+- [ ] Owner installs and tests `KaminariNfty-debug.apk` and `KaminariNfty_final_release.apk` on physical devices; both test variant paths must be run, not skipped.
+- [ ] Live ntfy reachability/topic/ACL/admin verification.
+- [ ] Production signing key setup.
+
 ## Phase 7 — release (NOT authorised)
 
 - [ ] Reproducible release signing.

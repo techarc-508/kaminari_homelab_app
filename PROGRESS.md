@@ -361,3 +361,48 @@ SHA256 source APK == SHA256 Desktop copy           # MATCH
 reachability/topic/ACL/admin verification; production signing key; hardware/Boox
 validation; live Proxmox validation.
 
+## Phase 8 — Stage 5 release engineering and publication preparation (2026-11-10)
+
+**Status: Complete — PASS WITH CONDITIONS.**
+
+- Inspected current release build config, signing model, `allowBackup`, backup/data-
+  extraction XMLs, and network security posture.
+- Produced documentation deliverables: `STAGE_5_RELEASE_ENGINEERING_REPORT.md`,
+  `R8_MINIFICATION_REVIEW.md`, `ANDROID_BACKUP_AND_DATA_EXTRACTION_POLICY.md`,
+  `NETWORK_SECURITY_REVIEW.md`, `RELEASE_SIGNING_FINAL_GUIDE.md`,
+  `RELEASE_BUILD_VALIDATION.md`.
+- Re-ran Android tests (361/0/0/2) and gateway tests (9 passed).
+- Rebuilt debug APK; produced test-only signed release APK `app/build/outputs/apk/release/app-release.apk`.
+- Release APK evidence:
+  - Size: 13,439,830 bytes
+  - SHA-256: `98276170c654c646472e32cda2f76da5aa3c67cf406cafb9cd9e0bc07367286f`
+  - Signed with test-only key `upload` in `/home/pushpal/KaminariNfty-test-signing-key.jks`.
+  - Package identity `com.rplab.kaminarinfty` confirmed from the binary `AndroidManifest.xml`
+    string pool.
+- Tooling limitation: the Stage 5 VM did not have `apksigner`, `aapt2`, or `apktool`,
+  and `keytool -printcert -jarfile` reported `Not a signed jar file` for the same APK.
+  This was treated as a tool limitation/escalation point, not as proof that the APK is
+  unsigned; the owner should reverify the artifact with `apksigner` on a machine that has
+  the Android SDK build tools.
+- No production signing key generated; no credentials committed; no security weakened to
+  make a build pass; no repo published in this stage.
+
+**Verification:**
+
+```text
+./gradlew test --no-daemon --rerun-tasks            # 361/0/0/2
+gateway tests (PYTHONPATH=. python3 -m pytest -q)  # 9 passed
+./gradlew assembleDebug --no-daemon --rerun-tasks  # BUILD SUCCESSFUL
+./gradlew assembleRelease --no-daemon --rerun-tasks -PreleaseKeystorePath=/home/pushpal/KaminariNfty-test-signing-key.jks -PreleaseStorePassword=<REDACTED> -PreleaseKeyPassword=<REDACTED>  # BUILD SUCCESSFUL (test-signed release APK)
+./gradlew lintDebug --no-daemon --rerun-tasks      # BUILD SUCCESSFUL, 0 errors
+SHA256 app/build/outputs/apk/release/app-release.apk == 98276170c654c646472e32cda2f76da5aa3c67cf406cafb9cd9e0bc07367286f
+```
+
+**Deliverables:** the six Stage 5 report files above, plus updates to `TODO.md` and
+`PROGRESS.md`.
+
+**Conditions:** owner installs and tests `KaminariNfty-debug.apk` and `KaminariNfty_final_release.apk`
+(including a real test of the release-variant path, not a debug APK slipped in as release);
+live ntfy reachability/topic/ACL/admin verification; production signing key; hardware/Boox
+validation; live Proxmox validation.
+

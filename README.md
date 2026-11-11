@@ -160,6 +160,7 @@ Owner-only live-access documents are kept outside Git at `~/.config/kaminari-nif
 - ntfy authentication is currently disabled on the owner’s server, so the app runs in Guest mode. No access token exists to issue or revoke.
 - The E-Ink profile is generic; vendor-specific Onyx Boox refresh APIs are deferred until the device arrives.
 - The Proxmox gateway is not deployed; only the least-privilege service identity and read-only API access were provisioned.
+- ntfy administration is not exposed in the app UI. The server has authentication disabled, so there is no admin identity to manage; `NtfyAdminClient` is a boundary for a future auth-enabled server.
 - Binary attachment upload is out of scope for v1; URL/metadata attachments are supported.
 
 ## Project history

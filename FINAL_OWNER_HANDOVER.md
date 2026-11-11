@@ -20,6 +20,7 @@
 - Physical device validation (notifications, Doze, reboot, OEM behavior, Android 15 timeout, Keystore, E-Ink ghosting).
 - Production signing key.
 - Live gateway deployment/TLS.
+- ntfy admin UI: the server is unauthenticated, and the app does not expose user/ACL/token management. The admin client is a boundary only.
 - ntfy authentication enablement and app token (server currently open).
 - Binary attachment upload (URL/metadata only by design).
 - Boox vendor-specific refresh tuning (device not arrived).

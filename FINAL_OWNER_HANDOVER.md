@@ -13,6 +13,7 @@
 - PVE least-privilege identity: `kaminari-gateway@pve!gateway-ro`, `KaminariRead`, read-only API verified.
 - Public GitHub repository with full history and documentation.
 - Debug and test-only signed release APKs on the Desktop, checksum-verified.
+- Public repository: https://github.com/techarc-508/kaminari_homelab_app (branch `main`; history reconciliation and scan in `STAGE_6_PUBLICATION_AND_DOCUMENTATION_REPORT.md`).
 
 ## What is not complete
 

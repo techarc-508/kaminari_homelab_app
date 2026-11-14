@@ -61,7 +61,21 @@ android {
     compose = true
     buildConfig = true
   }
-  testOptions { unitTests { isIncludeAndroidResources = true } }
+  testOptions {
+    unitTests {
+      isIncludeAndroidResources = true
+      // Opt-in live gateway checks; empty when the environment does not provide
+      // a tunnel, in which case GatewayLiveReadTest is skipped.
+      val liveGatewayUrl =
+        (findProperty("kaminariGatewayUrl") as String?) ?: System.getenv("KAMINARI_GATEWAY_URL") ?: ""
+      val liveGatewayToken =
+        (findProperty("kaminariGatewayToken") as String?) ?: System.getenv("KAMINARI_GATEWAY_TOKEN") ?: ""
+      all {
+        it.systemProperty("kaminari.gateway.url", liveGatewayUrl)
+        it.systemProperty("kaminari.gateway.token", liveGatewayToken)
+      }
+    }
+  }
   dependenciesInfo {
     includeInApk = false
     includeInBundle = true

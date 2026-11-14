@@ -17,6 +17,7 @@ data class AppPreferencesData(
     val sampleDataEnabled: Boolean = false,
     val activeProfileId: String? = null,
     val deliveryMode: DeliveryMode = DeliveryMode.DEFAULT,
+    val gatewayUrl: String = "",
 )
 
 /** Non-secret user preferences only. Secrets live in [SecretStore]. */
@@ -30,6 +31,10 @@ interface AppPreferences {
     suspend fun setActiveProfileId(id: String)
     suspend fun clearActiveProfileId()
     suspend fun setDeliveryMode(mode: DeliveryMode)
+
+    /** Non-secret gateway endpoint. The gateway token lives in [SecretStore]. */
+    suspend fun gatewayUrl(): String
+    suspend fun setGatewayUrl(url: String)
 }
 
 private val Context.settingsDataStore by preferencesDataStore(name = "kaminari_settings")
@@ -42,6 +47,7 @@ class DataStoreAppPreferences(private val context: Context) : AppPreferences {
         val SAMPLE_DATA = booleanPreferencesKey("sample_data_enabled")
         val ACTIVE_PROFILE = stringPreferencesKey("active_profile_id")
         val DELIVERY_MODE = stringPreferencesKey("delivery_mode")
+        val GATEWAY_URL = stringPreferencesKey("gateway_url")
     }
 
     override val data: Flow<AppPreferencesData> = context.settingsDataStore.data.map { prefs ->
@@ -54,6 +60,7 @@ class DataStoreAppPreferences(private val context: Context) : AppPreferences {
             activeProfileId = prefs[Keys.ACTIVE_PROFILE],
             // Legacy `SAVED` values are migrated to BATTERY_SAVER by fromPersisted.
             deliveryMode = DeliveryMode.fromPersisted(prefs[Keys.DELIVERY_MODE]),
+            gatewayUrl = prefs[Keys.GATEWAY_URL].orEmpty(),
         )
     }
 
@@ -82,5 +89,12 @@ class DataStoreAppPreferences(private val context: Context) : AppPreferences {
 
     override suspend fun setDeliveryMode(mode: DeliveryMode) {
         context.settingsDataStore.edit { it[Keys.DELIVERY_MODE] = mode.name }
+    }
+
+    override suspend fun gatewayUrl(): String =
+        context.settingsDataStore.data.first()[Keys.GATEWAY_URL].orEmpty()
+
+    override suspend fun setGatewayUrl(url: String) {
+        context.settingsDataStore.edit { it[Keys.GATEWAY_URL] = url.trim() }
     }
 }

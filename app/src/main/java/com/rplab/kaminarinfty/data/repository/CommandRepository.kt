@@ -43,22 +43,31 @@ sealed interface CommandActionResult {
 interface CommandRepository {
     fun observe(profileId: String, limit: Int = 100): Flow<List<CommandRequest>>
 
-    /** Creates one typed request. Non-destructive actions execute as MOCK immediately. */
+    /** Creates one typed request. Non-destructive actions execute immediately. */
     suspend fun create(
         profileId: String,
         actionId: String,
         args: Map<String, String>,
     ): CommandCreateResult
 
-    /** Confirms the exact profile/request/nonce and then executes it as MOCK. */
+    /**
+     * Confirms the exact profile/request/nonce, then executes it.
+     * [approvalCode] is the live RFC 6238 code; the gateway binds it to this
+     * exact command through a one-time challenge.
+     */
     suspend fun confirmAndExecute(
         profileId: String,
         commandId: String,
         nonce: String,
+        approvalCode: String? = null,
     ): CommandActionResult
 
     /** Resumes a SUBMITTED request that already has its required confirmation. */
-    suspend fun execute(profileId: String, commandId: String): CommandActionResult
+    suspend fun execute(
+        profileId: String,
+        commandId: String,
+        approvalCode: String? = null,
+    ): CommandActionResult
 
     /** Explicitly rejects a pending confirmation; never executes. */
     suspend fun reject(
@@ -74,8 +83,9 @@ interface CommandRepository {
 }
 
 /**
- * The only Phase 4 command orchestration. [executor] is the isolated mock
- * boundary; this class has no HTTP, PVE, SSH, shell or process dependency.
+ * Command orchestration. [executor] is the configured execution boundary: the
+ * production container injects the gateway executor, tests inject the mock.
+ * This class itself has no HTTP, PVE, SSH, shell or process dependency.
  */
 class RoomCommandRepository(
     private val database: KaminariDatabase,
@@ -168,7 +178,7 @@ class RoomCommandRepository(
                         commandId = commandId,
                         type = ActivityType.COMMAND_SUBMITTED,
                         severity = ActivitySeverity.INFO,
-                        summary = "Mock command ${action.id} requested (no real execution yet)",
+                        summary = "Command ${action.id} requested",
                         eventId = "command:$commandId:submitted",
                         timestamp = timestamp,
                     )
@@ -180,7 +190,7 @@ class RoomCommandRepository(
                             commandId = commandId,
                             type = ActivityType.COMMAND_CONFIRMATION_REQUIRED,
                             severity = ActivitySeverity.WARNING,
-                            summary = "Destructive mock command ${action.id} requires confirmation",
+                            summary = "Destructive command ${action.id} requires confirmation",
                             eventId = "command:$commandId:confirmation_required",
                             timestamp = timestamp,
                         )
@@ -205,7 +215,7 @@ class RoomCommandRepository(
         return if (action.requiresConfirmation) {
             CommandCreateResult.AwaitingConfirmation(created)
         } else {
-            when (val outcome = executeClaimed(profileId, commandId)) {
+            when (val outcome = executeClaimed(profileId, commandId, approvalCode = null)) {
                 is CommandActionResult.Completed -> CommandCreateResult.Completed(outcome.command)
                 is CommandActionResult.Expired -> CommandCreateResult.Rejected("Command request expired")
                 is CommandActionResult.Rejected -> CommandCreateResult.Rejected(outcome.reason)
@@ -217,6 +227,7 @@ class RoomCommandRepository(
         profileId: String,
         commandId: String,
         nonce: String,
+        approvalCode: String?,
     ): CommandActionResult {
         if (profileId.isBlank() || commandId.isBlank() || nonce.isBlank()) {
             return CommandActionResult.Rejected("Confirmation does not match an active request")
@@ -232,7 +243,7 @@ class RoomCommandRepository(
                             commandId = commandId,
                             type = ActivityType.COMMAND_CONFIRMED,
                             severity = ActivitySeverity.INFO,
-                            summary = "Confirmation accepted for mock command $commandId",
+                            summary = "Confirmation accepted for command $commandId",
                             eventId = "command:$commandId:confirmed",
                             timestamp = timestamp,
                         )
@@ -247,10 +258,14 @@ class RoomCommandRepository(
         }
 
         if (confirmed == 0) return diagnosePending(profileId, commandId, nonce)
-        return executeClaimed(profileId, commandId)
+        return executeClaimed(profileId, commandId, approvalCode)
     }
 
-    override suspend fun execute(profileId: String, commandId: String): CommandActionResult {
+    override suspend fun execute(
+        profileId: String,
+        commandId: String,
+        approvalCode: String?,
+    ): CommandActionResult {
         if (profileId.isBlank() || commandId.isBlank()) {
             return CommandActionResult.Rejected("Command request was not found")
         }
@@ -270,7 +285,7 @@ class RoomCommandRepository(
         if (current.requiresConfirmation && current.confirmedAt == null) {
             return CommandActionResult.Rejected("Confirm this destructive request first")
         }
-        return executeClaimed(profileId, commandId)
+        return executeClaimed(profileId, commandId, approvalCode)
     }
 
     override suspend fun reject(
@@ -292,7 +307,7 @@ class RoomCommandRepository(
                             commandId = commandId,
                             type = ActivityType.COMMAND_REJECTED,
                             severity = ActivitySeverity.WARNING,
-                            summary = "Mock command $commandId was rejected without execution",
+                            summary = "Command $commandId was rejected without execution",
                             eventId = "command:$commandId:rejected",
                             timestamp = timestamp,
                         )
@@ -331,7 +346,7 @@ class RoomCommandRepository(
                                 commandId = candidate.commandId,
                                 type = ActivityType.COMMAND_EXPIRED,
                                 severity = ActivitySeverity.WARNING,
-                                summary = "Mock command ${candidate.actionId} expired before execution",
+                                summary = "Command ${candidate.actionId} expired before execution",
                                 eventId = "command:${candidate.commandId}:expired",
                                 timestamp = timestamp,
                             )
@@ -365,7 +380,11 @@ class RoomCommandRepository(
         data object Expired : Claim
     }
 
-    private suspend fun executeClaimed(profileId: String, commandId: String): CommandActionResult {
+    private suspend fun executeClaimed(
+        profileId: String,
+        commandId: String,
+        approvalCode: String?,
+    ): CommandActionResult {
         val timestamp = now()
         val claim = try {
             database.withTransaction {
@@ -383,7 +402,7 @@ class RoomCommandRepository(
                                     commandId = commandId,
                                     type = ActivityType.COMMAND_EXPIRED,
                                     severity = ActivitySeverity.WARNING,
-                                    summary = "Mock command ${current.actionId} expired before execution",
+                                    summary = "Command ${current.actionId} expired before execution",
                                     eventId = "command:$commandId:expired",
                                     timestamp = timestamp,
                                 )
@@ -399,12 +418,12 @@ class RoomCommandRepository(
                             commandId = commandId,
                             type = ActivityType.COMMAND_EXECUTION_STARTED,
                             severity = ActivitySeverity.INFO,
-                            summary = "Mock execution started for ${current.actionId}",
+                            summary = "Execution started for ${current.actionId}",
                             eventId = "command:$commandId:execution_started",
                             timestamp = timestamp,
                         )
                     ) == -1L -> Claim.Rejected(
-                        "This mock execution was already claimed; it is not retried automatically"
+                        "This execution was already claimed; it is not retried automatically"
                     )
                     else -> Claim.Acquired(toDomain(current))
                 }
@@ -412,7 +431,7 @@ class RoomCommandRepository(
         } catch (ce: CancellationException) {
             throw ce
         } catch (_: Exception) {
-            return CommandActionResult.Rejected("Could not claim the mock execution")
+            return CommandActionResult.Rejected("Could not claim the execution")
         }
 
         when (claim) {
@@ -429,7 +448,7 @@ class RoomCommandRepository(
         val command = (claim as Claim.Acquired).command
         val envelope = command.toEnvelope()
         val execution = try {
-            executor.execute(envelope, command.confirmedAt)
+            executor.execute(envelope, command.confirmedAt, approvalCode)
         } catch (ce: CancellationException) {
             throw ce
         } catch (_: Exception) {
@@ -437,7 +456,7 @@ class RoomCommandRepository(
                 result = CommandResult(
                     mock = true,
                     ok = false,
-                    summary = "MOCK executor failed before producing a result",
+                    summary = "Command executor failed before producing a result",
                     detailJson = "{}",
                 ),
                 expired = false,
@@ -460,8 +479,7 @@ class RoomCommandRepository(
                                 profileId = profileId,
                                 commandId = commandId,
                                 type = ActivityType.COMMAND_EXPIRED,
-                                severity = ActivitySeverity.WARNING,
-                                summary = "Mock command ${command.actionId} expired before execution",
+                                severity = ActivitySeverity.WARNING,                                    summary = "Command ${command.actionId} expired before execution",
                                 eventId = "command:$commandId:expired",
                                 timestamp = timestampAfter,
                             )
@@ -488,7 +506,7 @@ class RoomCommandRepository(
                                 } else {
                                     ActivitySeverity.ERROR
                                 },
-                                summary = "Mock execution ${if (execution.result.ok) "completed" else "failed"} " +
+                                summary = "Execution ${if (execution.result.ok) "completed" else "failed"} " +
                                     "for ${command.actionId}: ${execution.result.summary}",
                                 eventId = "command:$commandId:result",
                                 timestamp = timestampAfter,
@@ -506,7 +524,7 @@ class RoomCommandRepository(
 
         if (transition == 0) {
             return CommandActionResult.Rejected(
-                "The command state changed before the mock result could be recorded"
+                "The command state changed before the result could be recorded"
             )
         }
         prune(profileId)

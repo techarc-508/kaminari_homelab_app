@@ -4,8 +4,8 @@ import com.rplab.kaminarinfty.model.CommandResult
 import org.json.JSONObject
 
 /**
- * Executor boundary. A real gateway is Phase 6 and requires a separate security
- * review; Phase 4 ships only [MockCommandExecutor].
+ * Executor boundary. Production wiring uses [GatewayCommandExecutor];
+ * [MockCommandExecutor] is retained for tests and sample/demo surfaces only.
  */
 interface CommandExecutor {
     val target: String
@@ -13,6 +13,7 @@ interface CommandExecutor {
     suspend fun execute(
         envelope: CommandEnvelope,
         confirmedAt: Long?,
+        approvalCode: String? = null,
     ): CommandExecutionResult
 }
 
@@ -38,6 +39,7 @@ class MockCommandExecutor(
     override suspend fun execute(
         envelope: CommandEnvelope,
         confirmedAt: Long?,
+        approvalCode: String?,
     ): CommandExecutionResult {
         val timestamp = now()
         val validation = CommandPolicy.validate(

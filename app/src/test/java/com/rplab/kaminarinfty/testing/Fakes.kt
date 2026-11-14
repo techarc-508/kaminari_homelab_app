@@ -66,6 +66,12 @@ class FakePreferences : AppPreferences {
     override suspend fun setDeliveryMode(mode: DeliveryMode) {
         state.update { it.copy(deliveryMode = mode) }
     }
+
+    override suspend fun gatewayUrl(): String = state.value.gatewayUrl
+
+    override suspend fun setGatewayUrl(url: String) {
+        state.update { it.copy(gatewayUrl = url) }
+    }
 }
 
 class FakeMessageRepository : MessageRepository {

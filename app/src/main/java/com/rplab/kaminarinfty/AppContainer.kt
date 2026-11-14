@@ -2,6 +2,10 @@ package com.rplab.kaminarinfty
 
 import android.app.Application
 import android.content.Context
+import com.rplab.kaminarinfty.commands.DefaultGatewayConfigStore
+import com.rplab.kaminarinfty.commands.GatewayCommandExecutor
+import com.rplab.kaminarinfty.commands.GatewayConfigStore
+import com.rplab.kaminarinfty.commands.GatewayProbe
 import com.rplab.kaminarinfty.data.local.KaminariDatabase
 import com.rplab.kaminarinfty.data.preferences.AppPreferences
 import com.rplab.kaminarinfty.data.preferences.DataStoreAppPreferences
@@ -14,7 +18,6 @@ import com.rplab.kaminarinfty.data.repository.NftyRepository
 import com.rplab.kaminarinfty.data.repository.OutboxRepository
 import com.rplab.kaminarinfty.data.repository.ProfileRepository
 import com.rplab.kaminarinfty.data.repository.RoomActivityRepository
-import com.rplab.kaminarinfty.commands.MockCommandExecutor
 import com.rplab.kaminarinfty.data.repository.CommandRepository
 import com.rplab.kaminarinfty.data.repository.RoomCommandRepository
 import com.rplab.kaminarinfty.data.repository.RoomMessageRepository
@@ -28,6 +31,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 
 /** Minimal manual DI container; one instance per process. */
 class AppContainer(context: Context) {
@@ -45,10 +49,23 @@ class AppContainer(context: Context) {
         activityRepository = activityRepository,
         publish = { profileId, request -> streamRepository.publish(profileId, request) },
     )
+
+    /** Gateway endpoint (DataStore) and token (Keystore) used by commands. */
+    val gatewayConfig: GatewayConfigStore = DefaultGatewayConfigStore(preferences, secretStore)
+    val gatewayProbe: GatewayProbe = GatewayProbe()
+
+    /**
+     * Production command path: every request goes to the deployed gateway.
+     * The connection is resolved per execution so a settings change applies
+     * without restarting the process. `runBlocking` runs on the executor's IO
+     * dispatcher and only reads local storage.
+     */
     val commandRepository: CommandRepository = RoomCommandRepository(
         database = database,
         activityRepository = activityRepository,
-        executor = MockCommandExecutor(),
+        executor = GatewayCommandExecutor(
+            connections = { runBlocking { gatewayConfig.connection() } },
+        ),
     )
     val deliveryController: DeliveryController = AndroidDeliveryController(context)
 

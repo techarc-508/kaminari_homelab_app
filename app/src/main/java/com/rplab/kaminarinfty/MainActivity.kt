@@ -41,6 +41,7 @@ import com.rplab.kaminarinfty.delivery.NftyNotifier
 import com.rplab.kaminarinfty.ui.components.NftyConfirmationSheet
 import com.rplab.kaminarinfty.ui.navigation.NftyBottomNavigationBar
 import com.rplab.kaminarinfty.ui.screens.ActivityScreen
+import com.rplab.kaminarinfty.ui.screens.AdminScreen
 import com.rplab.kaminarinfty.CommandUiState
 import com.rplab.kaminarinfty.CommandViewModel
 import com.rplab.kaminarinfty.CommandViewModelFactory
@@ -380,11 +381,16 @@ fun KaminariApp(
                         onSelectAction = commandViewModel::selectAction,
                         onArgChange = commandViewModel::updateArg,
                         onSubmit = commandViewModel::submit,
-                        onConfirmationInputChange = commandViewModel::updateConfirmationInput,
+                        onApprovalCodeChange = commandViewModel::updateApprovalCode,
                         onConfirm = commandViewModel::confirmPending,
                         onReject = commandViewModel::rejectPending,
                         onCancelConfirmation = commandViewModel::cancelPending,
                         onClearNotice = commandViewModel::clearNotice,
+                        onGatewayUrlChange = commandViewModel::updateGatewayUrl,
+                        onGatewayTokenChange = commandViewModel::updateGatewayToken,
+                        onSaveGateway = commandViewModel::saveGateway,
+                        onTestGateway = commandViewModel::testGateway,
+                        onClearGateway = commandViewModel::clearGateway,
                         onSettingsClick = { mainViewModel.navigateTo(AppDestination.SETTINGS) },
                         onRefresh = commandViewModel::refresh,
                     )
@@ -396,6 +402,15 @@ fun KaminariApp(
                         onBackClick = { mainViewModel.navigateTo(uiState.selectedTab) },
                         onMessageClick = { mainViewModel.openMessageDetail(it) },
                         onToggleSave = { mainViewModel.toggleSaveMessage(it) },
+                    )
+                }
+
+                AppDestination.ADMIN -> {
+                    AdminScreen(
+                        authState = uiState.authState,
+                        profileLabel = activeProfileName,
+                        onBackClick = { mainViewModel.navigateTo(AppDestination.SETTINGS) },
+                        onSettingsClick = { mainViewModel.navigateTo(AppDestination.SETTINGS) },
                     )
                 }
 
@@ -439,6 +454,7 @@ fun KaminariApp(
                         notificationsEnabled = notificationsEnabled,
                         onSelectDeliveryMode = { mainViewModel.setDeliveryMode(it) },
                         onOpenNotificationSettings = onOpenNotificationSettings,
+                        onOpenAdmin = { mainViewModel.navigateTo(AppDestination.ADMIN) },
                         onSearchClick = { mainViewModel.navigateTo(AppDestination.SEARCH) },
                     )
                 }

@@ -5,6 +5,9 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.rplab.kaminarinfty.commands.CommandCatalog
 import com.rplab.kaminarinfty.commands.CommandActionSpec
+import com.rplab.kaminarinfty.commands.GatewayConfigStore
+import com.rplab.kaminarinfty.commands.GatewayProbe
+import com.rplab.kaminarinfty.commands.GatewayUrlPolicy
 import com.rplab.kaminarinfty.data.repository.CommandRepository
 import com.rplab.kaminarinfty.data.repository.ProfileRepository
 import com.rplab.kaminarinfty.model.CommandRequest
@@ -18,7 +21,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 data class CommandUiState(
-    val backendLabel: String = "MOCK (no real execution)",
+    val backendLabel: String = "GATEWAY // not configured",
     val activeProfileId: String? = null,
     val actions: List<CommandActionSpec> = CommandCatalog.actions,
     val selectedActionId: String = CommandCatalog.actions.first().id,
@@ -32,6 +35,17 @@ data class CommandUiState(
     val pendingConfirmation: CommandRequest? = null,
     val confirmationInput: String = "",
     val confirmationError: String? = null,
+    /** Gateway provisioning (token input is write-only; stored token is never shown). */
+    val gatewayUrl: String = "",
+    val gatewayTokenInput: String = "",
+    val gatewayTokenStored: Boolean = false,
+    val gatewayConfigured: Boolean = false,
+    val gatewayBusy: Boolean = false,
+    val gatewayStatus: String? = null,
+    val gatewayError: String? = null,
+    val gatewayMutationsEnabled: Boolean? = null,
+    val gatewayStepUpEnrolled: Boolean? = null,
+    val approvalCode: String = "",
 ) {
     val selectedAction: CommandActionSpec? get() = actions.firstOrNull { it.id == selectedActionId }
     val confirmationRequired: Boolean get() = pendingConfirmation != null
@@ -40,10 +54,11 @@ data class CommandUiState(
 class CommandViewModel(
     private val commandRepository: CommandRepository,
     private val profileRepository: ProfileRepository,
-    private val backendLabel: String = "MOCK (no real execution)",
+    private val gatewayConfig: GatewayConfigStore,
+    private val gatewayProbe: GatewayProbe,
 ) : ViewModel() {
 
-    private val _uiState = MutableStateFlow(CommandUiState(backendLabel = backendLabel))
+    private val _uiState = MutableStateFlow(CommandUiState())
     val uiState: StateFlow<CommandUiState> = _uiState.asStateFlow()
 
     private var commandsJob: Job? = null
@@ -51,6 +66,7 @@ class CommandViewModel(
     private var hasBoundProfile = false
 
     init {
+        viewModelScope.launch { refreshGatewayConfig() }
         viewModelScope.launch {
             profileRepository.observeActiveProfileId().collect { profileId ->
                 if (hasBoundProfile && profileId == activeProfileId) return@collect
@@ -104,6 +120,101 @@ class CommandViewModel(
         }
     }
 
+    private suspend fun refreshGatewayConfig() {
+        val config = runCatching { gatewayConfig.state() }.getOrNull()
+        _uiState.update {
+            it.copy(
+                gatewayUrl = config?.url.orEmpty(),
+                gatewayTokenStored = config?.hasToken == true,
+                gatewayConfigured = config?.isConfigured == true,
+                backendLabel = if (config?.isConfigured == true) {
+                    "GATEWAY // configured"
+                } else {
+                    "GATEWAY // not configured"
+                },
+            )
+        }
+    }
+
+    fun updateGatewayUrl(value: String) {
+        _uiState.update { it.copy(gatewayUrl = value, gatewayError = null) }
+    }
+
+    fun updateGatewayToken(value: String) {
+        _uiState.update { it.copy(gatewayTokenInput = value, gatewayError = null) }
+    }
+
+    fun updateApprovalCode(value: String) {
+        val digits = value.filter { it.isDigit() }.take(6)
+        _uiState.update { it.copy(approvalCode = digits, confirmationError = null) }
+    }
+
+    /** Saves the endpoint and (optionally) a new token, then probes the gateway. */
+    fun saveGateway() {
+        val state = _uiState.value
+        val urlError = GatewayUrlPolicy.validationError(state.gatewayUrl)
+        if (urlError != null) {
+            _uiState.update { it.copy(gatewayError = urlError) }
+            return
+        }
+        if (state.gatewayTokenInput.isBlank() && !state.gatewayTokenStored) {
+            _uiState.update { it.copy(gatewayError = "Enter the gateway token") }
+            return
+        }
+        _uiState.update { it.copy(gatewayBusy = true, gatewayError = null, gatewayStatus = null) }
+        viewModelScope.launch {
+            try {
+                gatewayConfig.save(state.gatewayUrl, state.gatewayTokenInput)
+                _uiState.update { it.copy(gatewayTokenInput = "") }
+                refreshGatewayConfig()
+                probeGateway()
+            } catch (ce: IllegalArgumentException) {
+                _uiState.update { it.copy(gatewayBusy = false, gatewayError = ce.message ?: "Could not store the token") }
+            } catch (_: Exception) {
+                _uiState.update { it.copy(gatewayBusy = false, gatewayError = "Could not save gateway settings") }
+            }
+        }
+    }
+
+    fun testGateway() {
+        viewModelScope.launch { probeGateway() }
+    }
+
+    private suspend fun probeGateway() {
+        _uiState.update { it.copy(gatewayBusy = true, gatewayError = null) }
+        val health = gatewayProbe.probe(runCatching { gatewayConfig.connection() }.getOrNull())
+        _uiState.update {
+            it.copy(
+                gatewayBusy = false,
+                gatewayStatus = health.message,
+                gatewayError = if (health.reachable) null else health.message,
+                gatewayMutationsEnabled = if (health.reachable) health.mutationsEnabled else null,
+                gatewayStepUpEnrolled = if (health.reachable) health.stepUpEnrolled else null,
+                backendLabel = if (health.reachable) "GATEWAY // connected" else it.backendLabel,
+            )
+        }
+    }
+
+    fun clearGateway() {
+        viewModelScope.launch {
+            runCatching { gatewayConfig.clear() }
+            _uiState.update {
+                it.copy(
+                    gatewayUrl = "",
+                    gatewayTokenInput = "",
+                    gatewayTokenStored = false,
+                    gatewayConfigured = false,
+                    gatewayBusy = false,
+                    gatewayStatus = null,
+                    gatewayError = null,
+                    gatewayMutationsEnabled = null,
+                    gatewayStepUpEnrolled = null,
+                    backendLabel = "GATEWAY // not configured",
+                )
+            }
+        }
+    }
+
     fun selectAction(actionId: String) {
         val action = _uiState.value.actions.firstOrNull { it.id == actionId } ?: return
         _uiState.update {
@@ -146,7 +257,7 @@ class CommandViewModel(
                             pendingConfirmation = result.command,
                             confirmationInput = "",
                             confirmationError = null,
-                            notice = "Destructive mock command requires confirmation",
+                            notice = "Step-up approval required for this operation",
                         )
                     }
                 is com.rplab.kaminarinfty.data.repository.CommandCreateResult.Completed ->
@@ -154,7 +265,7 @@ class CommandViewModel(
                         it.copy(
                             isSubmitting = false,
                             notice = result.command.resultSummary
-                                ?: "Mock command completed",
+                                ?: "Command completed",
                         )
                     }
                 is com.rplab.kaminarinfty.data.repository.CommandCreateResult.Rejected ->
@@ -174,8 +285,11 @@ class CommandViewModel(
         val state = _uiState.value
         val profileId = state.activeProfileId ?: return
         val pending = state.pendingConfirmation ?: return
-        if (state.confirmationInput.trim() != pending.nonce) {
-            _uiState.update { it.copy(confirmationError = "Nonce does not match this request") }
+        val code = state.approvalCode.trim()
+        if (pending.requiresConfirmation && state.gatewayConfigured && !Regex("^[0-9]{6}$").matches(code)) {
+            _uiState.update {
+                it.copy(confirmationError = "Enter the current 6-digit authenticator code")
+            }
             return
         }
         _uiState.update { it.copy(isSubmitting = true, confirmationError = null) }
@@ -183,7 +297,8 @@ class CommandViewModel(
             when (val result = commandRepository.confirmAndExecute(
                 profileId = profileId,
                 commandId = pending.commandId,
-                nonce = state.confirmationInput.trim(),
+                nonce = pending.nonce,
+                approvalCode = code.ifBlank { null },
             )) {
                 is com.rplab.kaminarinfty.data.repository.CommandActionResult.Completed ->
                     _uiState.update {
@@ -191,8 +306,9 @@ class CommandViewModel(
                             isSubmitting = false,
                             pendingConfirmation = null,
                             confirmationInput = "",
+                            approvalCode = "",
                             notice = result.command.resultSummary
-                                ?: "Mock command completed",
+                                ?: "Command completed",
                         )
                     }
                 is com.rplab.kaminarinfty.data.repository.CommandActionResult.Expired ->
@@ -233,7 +349,7 @@ class CommandViewModel(
                             isSubmitting = false,
                             pendingConfirmation = null,
                             confirmationInput = "",
-                            notice = "Mock command rejected without execution",
+                            notice = "Command rejected without execution",
                         )
                     }
                 else ->
@@ -274,5 +390,7 @@ class CommandViewModelFactory(
     override fun <T : ViewModel> create(modelClass: Class<T>): T = CommandViewModel(
         commandRepository = container.commandRepository,
         profileRepository = container.profileRepository,
+        gatewayConfig = container.gatewayConfig,
+        gatewayProbe = container.gatewayProbe,
     ) as T
 }

@@ -18,10 +18,10 @@ For the release variant, uninstall the debug app first because the signing ident
 
 ```bash
 adb uninstall com.rplab.kaminarinfty
-adb install -r /home/pushpal/Desktop/KaminariNfty/KaminariNfty_final_release.apk
+adb install -r app-release.apk   # v1.2.0 release asset downloaded from GitHub
 ```
 
-Both have package `com.rplab.kaminarinfty`, versionCode `1`, versionName `1.0.0`.
+The current release is package `com.rplab.kaminarinfty`, versionCode `3`, versionName `1.2.0`.
 
 ## First run
 

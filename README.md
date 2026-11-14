@@ -5,11 +5,11 @@ A low-resource Android client for a self-hosted [ntfy](https://ntfy.sh) server, 
 ![Kotlin](https://img.shields.io/badge/Kotlin-2.2.10-7F52FF?logo=kotlin&logoColor=white)
 ![Android](https://img.shields.io/badge/Android-minSdk%2024%20%C2%B7%20target%2036-3DDC84?logo=android&logoColor=white)
 ![Compose](https://img.shields.io/badge/Jetpack%20Compose-BOM%202024.09.00-4285F4?logo=jetpackcompose&logoColor=white)
-![Tests](https://img.shields.io/badge/Android%20tests-361%20passed%20%C2%B7%202%20skipped-2EA043)
-![Version](https://img.shields.io/badge/version-1.0.0-blue)
-![Signing](https://img.shields.io/badge/release-test--only%20signed-orange)
+![Tests](https://img.shields.io/badge/Android%20tests-414%20passed%20%C2%B7%203%20skipped-2EA043)
+![Version](https://img.shields.io/badge/version-1.2.0-blue)
+![Signing](https://img.shields.io/badge/release-signed%20%C2%B7%20a8a88887-orange)
 
-> **Release status:** `v1.0.0` is a test-only-signed build for owner installation and evaluation. It is not production-signed and has not been validated on physical hardware. See [Release and signing](docs/RELEASE_AND_SIGNING.md).
+> **Release status:** `v1.2.0` (versionCode `3`) is signed with the established Kaminari Nfty release identity (certificate SHA-256 `a8a88887…10b8`) and published as a GitHub release asset. It has not been validated on physical hardware. See [Release and signing](docs/RELEASE_AND_SIGNING.md).
 
 ## What it does
 
@@ -23,7 +23,7 @@ Kaminari Nfty is a real ntfy client, not a mock-up:
 - **Delivery modes:** Instant foreground stream (best effort) and Battery Saver WorkManager polling (periodic and inexact).
 - **Standard and E-Ink profiles:** the E-Ink profile is a complete monochrome presentation with no motion, gradients or shadows, not a grayscale tint.
 - **Activity timeline:** bounded, profile-scoped publish/receive/retry/command events (90 days / 5,000 per profile).
-- **Command Centre:** typed `rplab.command.v1` envelopes, allowlist, five-minute expiry, single-use nonce and destructive confirmation — with a **mock executor only**. It never executes shell, SSH or Proxmox commands.
+- **Command Centre:** typed `kf.command.v1` envelopes built from the shared 14-action catalogue, allowlist, five-minute expiry, single-use nonce, risk levels and destructive confirmation. Execution goes to the separately deployed gateway; the mock executor is test-only. The APK never sends shell, SSH or arbitrary Proxmox commands.
 - **Separate gateway:** an independent FastAPI service can expose read-only Proxmox data. The APK never contains Proxmox credentials.
 
 ## Verified environment
@@ -98,7 +98,7 @@ export KEY_PASSWORD="$(cat "$HOME/.config/kaminari-nifty/.signing_pw")"
 # app/build/outputs/apk/release/app-release.apk
 ```
 
-The release variant has R8 minification and resource shrinking enabled, with the ProGuard rules in `app/proguard-rules.pro`. The resulting APK is test-only signed; it is not a Play Store key.
+The release variant has R8 minification and resource shrinking enabled, with the ProGuard rules in `app/proguard-rules.pro`. The resulting APK is signed with the established release identity at `~/.kaminari-signing/release.jks` (alias `upload`, certificate SHA-256 `a8a88887ddb0ad5f0045806860670c6c08481fe8a95ebcdbbaa05846a61910b8`).
 
 ### Tests
 
@@ -108,7 +108,7 @@ The release variant has R8 minification and resource shrinking enabled, with the
 cd gateway && PYTHONPATH=. python3 -m pytest -q
 ```
 
-Verified on 2026-11-11: **361 Android tests, 0 failures, 0 errors, 2 skipped** (the two skips are the pre-existing Robolectric Keystore round-trip cases), **9 gateway tests passed**. Lint: **0 errors, 56 warnings**.
+Verified on 2026-11-15 for `v1.2.0`: **414 Android tests, 0 failures, 0 errors, 3 skipped** (the skips are the Robolectric Keystore round-trip cases, which need a hardware-backed provider), **70 gateway tests passed**. Lint: **0 errors, 49 warnings**.
 
 ## Install
 
@@ -150,8 +150,8 @@ Owner-only live-access documents are kept outside Git at `~/.config/kaminari-nif
 - No token, password, PVE secret or signing key is in the APK, source, docs or Git history.
 - The public app identity is non-admin; the PVE gateway uses a dedicated read-only `<gateway-user>@pve` token with `KaminariRead` and privilege separation.
 - The gateway has no mutation permission; `GATEWAY_MUTATIONS_ENABLED` stays `false`.
-- The Android Command Centre uses a mock executor and never sends shell, SSH or Proxmox commands.
-- Release signing is test-only; rotate it before production distribution.
+- The Android Command Centre never sends shell, SSH or arbitrary Proxmox commands; it emits typed envelopes to the gateway, whose mutations remain disabled unless the owner enables them.
+- The release signing identity is established and must be preserved for upgrade compatibility; rotate it only deliberately, and never regenerate it silently.
 
 ## Limitations
 

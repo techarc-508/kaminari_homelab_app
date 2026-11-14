@@ -2,18 +2,21 @@
 
 ## Current artifacts
 
+Current release: **`v1.2.0`, versionCode 3**.
+
 | Artifact | Source | Size | SHA-256 |
 |---|---|---|---|
-| `KaminariNfty-debug.apk` | `app/build/outputs/apk/debug/app-debug.apk` | 19,918,197 B | `0a9bc2fed9bc23f105c83e55e35f5030807dd37465976ae2b56d2cfa9f43ad55` |
-| `KaminariNfty_final_release.apk` | `app/build/outputs/apk/release/app-release.apk` | 2,492,137 B | `5eb29b07647566e79c1e03ff1ee5e873ada4ed4aeffc7db7c366429e20cb55be` |
+| `app-release.apk` (v1.2.0) | `app/build/outputs/apk/release/app-release.apk` | 2,510,585 B | `9b953b064e28f8d7e761fdc23654f6508af39c1ae9945b8b3e9470ea10d71027` |
 
-Both are copied to `/home/pushpal/Desktop/KaminariNfty/` and match their source checksums.
+The release APK is distributed as a GitHub release asset. Debug builds are development-only and are not published; their size changes with the debug toolchain, so no fixed checksum is recorded here.
+
+Superseded artifacts from earlier builds (`1.0.x`, `1.1.0`) have been removed so exactly one current APK is offered.
 
 ## Package metadata
 
 - applicationId: `com.rplab.kaminarinfty`
-- versionCode: `1`
-- versionName: `1.0.0`
+- versionCode: `3`
+- versionName: `1.2.0`
 - minSdk: 24
 - targetSdk: 36
 - compileSdk: 36.1
@@ -23,9 +26,9 @@ Both are copied to `/home/pushpal/Desktop/KaminariNfty/` and match their source 
 | Variant | Certificate | SHA-256 |
 |---|---|---|
 | Debug | `CN=Android Debug, O=Android, C=US` | `0fcc0c8194dc885a9b731582e0b4e9231a6680f088e8f0386a78fc379d900b67` |
-| Release | `CN=Kaminari Nfty Test Signing, OU=RPLab, O=Kaminari, L=Local, ST=Local, C=US` | `dc9c381cb83052ff3df384e968cf6ea6569ec643e24be6bfff0bfce0b88210d1` |
+| Release | `CN=Kaminari Nfty, OU=RPLab, O=RPLab, C=IN` | `a8a88887ddb0ad5f0045806860670c6c08481fe8a95ebcdbbaa05846a61910b8` |
 
-The release key is **test-only**. It is stored outside Git at `~/.config/kaminari-nifty/kaminari-test-signing-2026-11-11.jks` with mode 600. Passwords are in `.signing_pw` (600). Do not publish this key.
+The release key is the **established Kaminari Nfty identity** and must be preserved: changing it breaks upgrade installation for every existing install. It is stored outside Git at `~/.kaminari-signing/release.jks` (alias `upload`, mode 600) with its password in `~/.kaminari-signing/password.txt` (600). Do not publish, regenerate or commit this key, and do not weaken the container signature algorithm.
 
 ## Build commands
 
@@ -34,9 +37,9 @@ The release key is **test-only**. It is stored outside Git at `~/.config/kaminar
 ./gradlew assembleDebug
 
 # Release with R8 and resource shrinking
-export KEYSTORE_PATH="$HOME/.config/kaminari-nifty/kaminari-test-signing-2026-11-11.jks"
-export STORE_PASSWORD="$(cat "$HOME/.config/kaminari-nifty/.signing_pw")"
-export KEY_PASSWORD="$(cat "$HOME/.config/kaminari-nifty/.signing_pw")"
+export KEYSTORE_PATH="$HOME/.kaminari-signing/release.jks"
+export STORE_PASSWORD="$(cat "$HOME/.kaminari-signing/password.txt")"
+export KEY_PASSWORD="$STORE_PASSWORD"
 ./gradlew assembleRelease
 ```
 

@@ -1,5 +1,7 @@
 package com.rplab.kaminarinfty.commands
 
+import com.rplab.kaminarinfty.contract.KfActionCatalog
+import com.rplab.kaminarinfty.contract.KfRisk
 import com.rplab.kaminarinfty.data.api.NtfyEndpoint
 import java.util.UUID
 import kotlin.math.abs
@@ -20,78 +22,79 @@ data class CommandActionSpec(
     val description: String,
     val arguments: List<CommandArgument> = emptyList(),
     val requiresConfirmation: Boolean = false,
+    val risk: KfRisk = KfRisk.L0,
+    val mutation: Boolean = false,
+    val stepUpRequired: Boolean = false,
+    val ownerConfirmation: Boolean = false,
     val mockResult: (Map<String, String>) -> String,
 )
 
+/**
+ * Android's typed view of the shared action catalogue. The operation IDs, risk
+ * levels and wire confirmation rule come from [KfActionCatalog]; a contract
+ * test asserts parity with `contracts/kf_contract.v1.json` and the gateway.
+ */
 object CommandCatalog {
-    private val resourceName = Regex("^[a-z0-9][a-z0-9_-]{0,31}$")
+    private val nodePattern = Regex("^[a-z0-9][a-z0-9_-]{0,31}$")
+    private val vmidPattern = Regex("^[0-9]{1,10}$")
 
-    val actions: List<CommandActionSpec> = listOf(
-        CommandActionSpec(
-            id = "host.health",
-            title = "Host health",
-            description = "Read-only health summary from the mock target.",
-            mockResult = { "host healthy" },
-        ),
-        CommandActionSpec(
-            id = "service.status",
-            title = "Service status",
-            description = "Read-only status for one allowlisted service name.",
-            arguments = listOf(
-                CommandArgument(
-                    key = "service",
-                    label = "Service",
-                    placeholder = "navidrome",
-                    pattern = resourceName,
-                    hint = "lowercase letters, digits, _ or - (max 32)",
-                ),
-            ),
-            mockResult = { args -> "${args["service"]} running" },
-        ),
-        CommandActionSpec(
-            id = "storage.summary",
-            title = "Storage summary",
-            description = "Read-only storage utilisation summary.",
-            mockResult = { "42% used" },
-        ),
-        CommandActionSpec(
-            id = "backup.latest_status",
-            title = "Latest backup status",
-            description = "Read-only status of the latest simulated backup.",
-            mockResult = { "last backup OK" },
-        ),
-        CommandActionSpec(
-            id = "container.status",
-            title = "Container status",
-            description = "Read-only status for one allowlisted container name.",
-            arguments = listOf(
-                CommandArgument(
-                    key = "container",
-                    label = "Container",
-                    placeholder = "jellyfin",
-                    pattern = resourceName,
-                    hint = "lowercase letters, digits, _ or - (max 32)",
-                ),
-            ),
-            mockResult = { args -> "${args["container"]} running" },
-        ),
-        CommandActionSpec(
-            id = "service.restart",
-            title = "Restart service (simulated)",
-            description = "Destructive action; confirmation is required. Phase 4 only simulates it.",
-            arguments = listOf(
-                CommandArgument(
-                    key = "service",
-                    label = "Service",
-                    placeholder = "navidrome",
-                    pattern = resourceName,
-                    hint = "lowercase letters, digits, _ or - (max 32)",
-                ),
-            ),
-            requiresConfirmation = true,
-            mockResult = { args -> "restart of ${args["service"]} simulated; no real service was changed" },
-        ),
+    private fun argument(key: String): CommandArgument = when (key) {
+        "node" -> CommandArgument(
+            key = "node",
+            label = "Node",
+            placeholder = "pve",
+            pattern = nodePattern,
+            hint = "lowercase letters, digits, _ or - (max 32)",
+        )
+        "vmid" -> CommandArgument(
+            key = "vmid",
+            label = "Guest ID",
+            placeholder = "100",
+            pattern = vmidPattern,
+            hint = "digits only (max 10)",
+        )
+        else -> error("Unsupported command argument: $key")
+    }
+
+    private val mockResults: Map<String, (Map<String, String>) -> String> = mapOf(
+        "host.health" to { "host healthy (simulated)" },
+        "node.list" to { "1 node (simulated)" },
+        "vm.list" to { args -> "VM inventory for ${args["node"]} (simulated)" },
+        "container.list" to { args -> "container inventory for ${args["node"]} (simulated)" },
+        "vm.status" to { args -> "VM ${args["vmid"]} simulated running" },
+        "container.status" to { args -> "container ${args["vmid"]} simulated running" },
+        "storage.summary" to { args -> "storage on ${args["node"]} simulated" },
+        "task.history" to { args -> "recent tasks on ${args["node"]} simulated" },
+        "vm.start" to { args -> "start of VM ${args["vmid"]} simulated; no real guest changed" },
+        "vm.stop" to { args -> "stop of VM ${args["vmid"]} simulated; no real guest changed" },
+        "vm.restart" to { args -> "restart of VM ${args["vmid"]} simulated; no real guest changed" },
+        "container.start" to { args ->
+            "start of container ${args["vmid"]} simulated; no real guest changed"
+        },
+        "container.stop" to { args ->
+            "stop of container ${args["vmid"]} simulated; no real guest changed"
+        },
+        "container.restart" to { args ->
+            "restart of container ${args["vmid"]} simulated; no real guest changed"
+        },
     )
+
+    val actions: List<CommandActionSpec> = KfActionCatalog.actions.map { spec ->
+        CommandActionSpec(
+            id = spec.id,
+            title = spec.title,
+            description = spec.description,
+            arguments = spec.args.map(::argument),
+            // The wire field is true for every mutation so the gateway can bind
+            // an approval to it; risk metadata still distinguishes L1 from L2.
+            requiresConfirmation = spec.mutation,
+            risk = spec.risk,
+            mutation = spec.mutation,
+            stepUpRequired = spec.stepUp,
+            ownerConfirmation = spec.ownerConfirmation,
+            mockResult = mockResults.getValue(spec.id),
+        )
+    }
 
     fun action(id: String): CommandActionSpec? = actions.firstOrNull { it.id == id }
 
@@ -105,7 +108,7 @@ object CommandCatalog {
         action.arguments.forEach { spec ->
             val value = args[spec.key].orEmpty()
             if (value.isEmpty()) return "${spec.label} is required"
-            if (value.length > 32 || !spec.pattern.matches(value)) {
+            if (!spec.pattern.matches(value)) {
                 return "${spec.label} must be ${spec.hint}"
             }
         }
@@ -125,6 +128,10 @@ sealed interface CommandValidation {
  */
 object CommandPolicy {
     private val requestedByPattern = Regex("^android:[A-Za-z0-9_-]{1,56}$")
+    private val replyTopics = setOf(
+        COMMAND_REPLY_TOPIC,
+        LEGACY_COMMAND_REPLY_TOPIC,
+    )
 
     fun validate(
         envelope: CommandEnvelope,
@@ -155,13 +162,13 @@ object CommandPolicy {
             return CommandValidation.Invalid("Command request has expired")
         }
         if (envelope.target != expectedTarget) {
-            return CommandValidation.Invalid("Target is not the approved mock target")
+            return CommandValidation.Invalid("Target is not the approved command target")
         }
         if (!requestedByPattern.matches(envelope.requestedBy)) {
             return CommandValidation.Invalid("requested_by is invalid")
         }
-        if (!NtfyEndpoint.isValidTopic(envelope.replyTopic)) {
-            return CommandValidation.Invalid("reply_topic is not a valid ntfy topic")
+        if (envelope.replyTopic !in replyTopics) {
+            return CommandValidation.Invalid("reply_topic is not an approved result topic")
         }
 
         val action = CommandCatalog.action(envelope.action)

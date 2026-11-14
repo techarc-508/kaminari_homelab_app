@@ -1,5 +1,6 @@
 package com.rplab.kaminarinfty.data.local
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.Index
@@ -34,6 +35,10 @@ data class TopicSubscriptionEntity(
     val isSubscribed: Boolean = true,
     val isPaused: Boolean = false,
     val priorityThreshold: Int? = null,
+    /** Approved `kf-` category; OTHER for legacy or user-entered topics. */
+    @ColumnInfo(defaultValue = "OTHER") val category: String = "OTHER",
+    /** Default notification priority for this topic (1–5). */
+    @ColumnInfo(defaultValue = "3") val priority: Int = 3,
     val createdAt: Long = System.currentTimeMillis(),
 )
 

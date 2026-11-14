@@ -43,6 +43,7 @@ enum class AppDestination {
     OUTBOX,
     ACTIVITY,
     COMMANDS,
+    ADMIN,
     SETTINGS,
     SEARCH,
 }

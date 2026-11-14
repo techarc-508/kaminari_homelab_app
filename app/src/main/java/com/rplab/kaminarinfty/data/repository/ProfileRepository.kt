@@ -1,5 +1,8 @@
 package com.rplab.kaminarinfty.data.repository
 
+import com.rplab.kaminarinfty.contract.KfPriority
+import com.rplab.kaminarinfty.contract.KfTopicCatalog
+import com.rplab.kaminarinfty.contract.KfTopicCategory
 import com.rplab.kaminarinfty.data.local.KaminariDatabase
 import com.rplab.kaminarinfty.data.local.ServerProfileEntity
 import com.rplab.kaminarinfty.data.local.TopicSubscriptionEntity
@@ -71,12 +74,17 @@ class DefaultProfileRepository(
     override fun observeTopics(profileId: String): Flow<List<NftyTopic>> =
         topicDao.observeForProfile(profileId).map { rows ->
             rows.map {
+                val spec = KfTopicCatalog.topic(it.topic)
                 NftyTopic(
                     name = it.topic,
-                    description = "Subscribed on this device",
+                    description = spec?.description ?: "Subscribed on this device",
                     isSubscribed = it.isSubscribed,
                     isPaused = it.isPaused,
                     lastActivityTime = it.createdAt,
+                    category = spec?.category ?: runCatching {
+                        KfTopicCategory.valueOf(it.category)
+                    }.getOrDefault(KfTopicCategory.OTHER),
+                    priority = it.priority,
                 )
             }
         }
@@ -176,7 +184,15 @@ class DefaultProfileRepository(
     }
 
     override suspend fun addTopic(profileId: String, topic: String) {
-        topicDao.insert(TopicSubscriptionEntity(profileId = profileId, topic = topic))
+        val spec = KfTopicCatalog.topic(topic)
+        topicDao.insert(
+            TopicSubscriptionEntity(
+                profileId = profileId,
+                topic = topic,
+                category = spec?.category?.name ?: KfTopicCategory.OTHER.name,
+                priority = if (spec?.priority == KfPriority.HIGH) 4 else 3,
+            )
+        )
     }
 
     override suspend fun setTopicSubscribed(profileId: String, topic: String, subscribed: Boolean) =

@@ -1,6 +1,7 @@
 package com.rplab.kaminarinfty.commands
 
 import android.util.Base64
+import com.rplab.kaminarinfty.contract.KfActionCatalog
 import java.security.SecureRandom
 import java.text.ParseException
 import java.text.SimpleDateFormat
@@ -9,9 +10,11 @@ import java.util.Locale
 import java.util.TimeZone
 import org.json.JSONObject
 
-const val COMMAND_SCHEMA = "rplab.command.v1"
+const val COMMAND_SCHEMA = KfActionCatalog.COMMAND_SCHEMA
 const val MOCK_COMMAND_TARGET = "mock-pve"
-const val COMMAND_REPLY_TOPIC = "rplab-command-results"
+const val COMMAND_REPLY_TOPIC = KfActionCatalog.COMMAND_REPLY_TOPIC
+/** Accepted only for legacy result correlation; new requests use the kf- topic. */
+const val LEGACY_COMMAND_REPLY_TOPIC = KfActionCatalog.LEGACY_COMMAND_REPLY_TOPIC
 const val COMMAND_EXPIRY_MS = 5L * 60L * 1_000L
 const val COMMAND_CLOCK_SKEW_MS = 60L * 1_000L
 

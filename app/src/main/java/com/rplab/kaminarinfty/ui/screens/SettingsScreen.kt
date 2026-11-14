@@ -100,6 +100,7 @@ fun SettingsScreen(
     notificationsEnabled: Boolean,
     onSelectDeliveryMode: (DeliveryMode) -> Unit,
     onOpenNotificationSettings: () -> Unit,
+    onOpenAdmin: () -> Unit = {},
     onSearchClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -632,6 +633,28 @@ fun SettingsScreen(
                                 color = KaminariTheme.colors.textPrimary,
                             )
                         }
+                    }
+                }
+            }
+
+            SettingsSectionCard(title = "ADMINISTRATION", icon = Icons.Default.Storage) {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        text = "Administration is gateway-backed. The APK never holds an ntfy " +
+                            "admin credential and cannot execute privileged operations directly.",
+                        fontFamily = RubikFontFamily,
+                        fontSize = 11.sp,
+                        color = KaminariTheme.colors.textSecondary,
+                    )
+                    OutlinedButton(
+                        onClick = onOpenAdmin,
+                        modifier = Modifier.testTag("settings_open_admin"),
+                    ) {
+                        Text(
+                            text = "Open administration",
+                            fontFamily = RubikFontFamily,
+                            fontSize = 12.sp,
+                        )
                     }
                 }
             }

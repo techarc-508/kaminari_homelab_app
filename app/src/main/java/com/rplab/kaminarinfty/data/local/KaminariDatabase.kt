@@ -12,7 +12,8 @@ import androidx.sqlite.db.SupportSQLiteDatabase
  * subscriptions and server profiles.
  *
  * v1 is the initial schema. v2 adds the outbox, activity and command tables
- * through [MIGRATION_1_2]. Destructive migrations are intentionally NOT enabled:
+ * through [MIGRATION_1_2]. v3 adds approved topic category and default priority
+ * through [MIGRATION_2_3]. Destructive migrations are intentionally NOT enabled:
  * future schema changes must append explicit migrations here (AGENTS.md §5).
  */
 @Database(
@@ -24,7 +25,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         ActivityEventEntity::class,
         CommandRequestEntity::class,
     ],
-    version = 2,
+    version = 3,
     exportSchema = true,
 )
 abstract class KaminariDatabase : RoomDatabase() {
@@ -105,8 +106,23 @@ abstract class KaminariDatabase : RoomDatabase() {
             }
         }
 
+        /**
+         * Additive v2→v3 migration. Existing subscriptions keep their rows;
+         * legacy topics become category OTHER with the normal priority.
+         */
+        val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "ALTER TABLE `topic_subscriptions` ADD COLUMN `category` TEXT NOT NULL DEFAULT 'OTHER'"
+                )
+                db.execSQL(
+                    "ALTER TABLE `topic_subscriptions` ADD COLUMN `priority` INTEGER NOT NULL DEFAULT 3"
+                )
+            }
+        }
+
         /** Append explicit migrations here when the schema version increases. */
-        val MIGRATIONS: Array<Migration> = arrayOf(MIGRATION_1_2)
+        val MIGRATIONS: Array<Migration> = arrayOf(MIGRATION_1_2, MIGRATION_2_3)
 
         fun build(context: Context): KaminariDatabase =
             Room.databaseBuilder(

@@ -19,6 +19,13 @@ local.properties
 debug.keystore
 dist/
 *.jks
+*.keystore
+*.p12
+*.apk
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3
 release.properties
 local.properties.release
 *.properties

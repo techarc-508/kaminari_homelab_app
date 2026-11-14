@@ -1,0 +1,40 @@
+# Kaminari music notifier: forwards real music-pipeline events to ntfy.
+#
+#   NTFY_TOKEN comes from /opt/kaminari-ntfy/credentials.env (host, mode 600).
+#   Deploy:  docker compose -f ops/music-notifier/docker-compose.yml up -d
+services:
+  kf-music-notifier:
+    image: python:3.12-alpine
+    container_name: kf-music-notifier
+    restart: unless-stopped
+    command: ["python3", "/app/app.py"]
+    environment:
+      PIPELINE_URL: "http://music-pipeline-api:8600"
+      NTFY_URL: "http://192.168.0.104:8201"
+      TOPIC_EVENTS: "kf-music-pipeline"
+      TOPIC_REPORTS: "kf-music-reports"
+      POLL_SECONDS: "30"
+      STATE_PATH: "/data/state.json"
+    env_file:
+      - /opt/kaminari-ntfy/music-notifier.env
+    volumes:
+      - /opt/kaminari-music-notify/app.py:/app/app.py:ro
+      - kf_music_notifier_data:/data
+    networks:
+      - pipeline
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    mem_limit: 128m
+
+networks:
+  pipeline:
+    name: deploy_default
+    external: true
+
+volumes:
+  kf_music_notifier_data:

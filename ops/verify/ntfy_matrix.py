@@ -58,6 +58,11 @@ check("anon_pub_legacy_onboarding", 200, pub("kaminari-onboarding-test")[0])
 check("anon_pub_kf_monitor_topic", 403, pub("kf-pve-host")[0])
 check("anon_read_kf_topic", 403, read("kf-pve-host")[0])
 check("anon_pub_kf_music", 403, pub("kf-music-pipeline")[0])
+# command-result topics must not be anonymous in either direction (correction C)
+check("anon_pub_kf_command_result", 403, pub("kf-command-result")[0])
+check("anon_read_kf_command_result", 403, read("kf-command-result")[0])
+check("anon_pub_legacy_command_results", 403, pub("rplab-command-results")[0])
+check("anon_read_legacy_command_results", 403, read("rplab-command-results")[0])
 
 # kf_monitor
 m = tokens["kf_monitor"]
@@ -85,6 +90,8 @@ check("app_read_music", 200, read("kf-music-pipeline", app)[0])
 check("app_pub_command_request", 200, pub("kf-command-request", app)[0])
 check("app_pub_infra_denied", 403, pub("kf-pve-host", app)[0])
 check("app_pub_legacy_everyone_rule", 200, pub("kaminari-diary", app)[0])  # everyone rule covers all visitors
+check("app_read_command_result", 200, read("kf-command-result", app)[0])
+check("app_pub_command_result_denied", 403, pub("kf-command-result", app)[0])
 
 # kf_gateway
 gw = tokens["kf_gateway"]

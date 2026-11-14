@@ -2,23 +2,38 @@
 <!--
   Kaminari Nfty network policy.
 
-  Plain http stays blocked everywhere except the loopback addresses used by
-  development and Robolectric tests. The gateway is reached over TLS on the
-  private tailnet endpoint, whose certificate is issued by the Kaminari Gateway
-  Private CA (validity 825 days, SANs limited to the gateway's tailnet/LAN
-  addresses). The CA private key never leaves the offline PKI directory, so
-  trusting the root here does not let anyone else impersonate the gateway.
+  Trust is deliberately narrow:
 
-  The gateway certificate itself is additionally bound by the URL policy in
-  GatewayUrlPolicy (https required for every non-loopback host).
+  * base-config carries the normal platform trust store and blocks cleartext.
+  * The Kaminari Gateway Private CA is trusted ONLY for the gateway host
+    (100.82.207.40, the PVE tailnet address used by the TLS route). It is not a
+    process-wide trust anchor, so no other host can be impersonated with it.
+  * ntfy is reached over the public HTTPS hostname ntfy.rplab.qzz.io, whose
+    certificate chains to a platform root; it needs no private anchor.
+  * Plain http stays blocked everywhere except the loopback addresses used by
+    development and Robolectric tests.
+
+  Certificate rotation: the gateway CA expires 2029-02-13 and the leaf
+  2027-02-13. To rotate, replace res/raw/kf_gateway_ca.pem (or add the new
+  anchor alongside the old one), rebuild and re-sign the release APK, and only
+  then swap the certificate on the PVE route. See
+  docs/CERTIFICATE_ROTATION.md.
 -->
 <network-security-config>
     <base-config cleartextTrafficPermitted="false">
         <trust-anchors>
             <certificates src="system" />
-            <certificates src="@raw/kf_gateway_ca" />
         </trust-anchors>
     </base-config>
+
+    <!-- Host-scoped private CA: gateway only. -->
+    <domain-config cleartextTrafficPermitted="false">
+        <domain includeSubdomains="false">100.82.207.40</domain>
+        <trust-anchors>
+            <certificates src="system" />
+            <certificates src="@raw/kf_gateway_ca" />
+        </trust-anchors>
+    </domain-config>
 
     <domain-config cleartextTrafficPermitted="true">
         <domain includeSubdomains="false">127.0.0.1</domain>

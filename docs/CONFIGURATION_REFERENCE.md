@@ -36,9 +36,10 @@ Retention:
 | Item | Value |
 |---|---|
 | Canonical URL | `https://ntfy.rplab.qzz.io` |
-| LAN origin | `http://<private-ntfy-lan>:8201` |
+| LAN origin (producers/tunnel only, **never the app**) | `http://<private-ntfy-lan>:8201` |
 | Version | ntfy 2.28.0 |
-| Auth | disabled (`users=0`) |
+| Auth | enabled, `auth-default-access: deny-all`, 7 identities + anonymous legacy |
+| App credential | non-admin `kaminari_app` access token (separate from the gateway token) |
 | Existing topic | `KAMINARI-FUJI-Homelab` |
 | Test topic | `kaminari-onboarding-test` |
 

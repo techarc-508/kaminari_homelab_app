@@ -323,18 +323,21 @@
     {
       "id": "KAMINARI-FUJI-Homelab",
       "state": "active",
+      "anonymous": true,
       "replacement": ["kf-pve-host", "kf-pve-ct", "kf-pve-vm", "kf-backups", "kf-web", "kf-services", "kf-network"],
       "rule": "Never delete without explicit owner approval; migrate producers first."
     },
     {
       "id": "kaminari-diary",
       "state": "active",
+      "anonymous": true,
       "replacement": ["kf-diary"],
       "rule": "Owner approval required before retirement."
     },
     {
       "id": "kaminari-onboarding-test",
       "state": "active",
+      "anonymous": true,
       "replacement": [],
       "rule": "Test-only; restrict after onboarding migration (P-09)."
     }

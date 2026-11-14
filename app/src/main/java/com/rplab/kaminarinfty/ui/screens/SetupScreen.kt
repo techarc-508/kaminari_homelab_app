@@ -333,7 +333,7 @@ fun SetupScreen(
                     OutlinedTextField(
                         value = tokenOrPassword,
                         onValueChange = { tokenOrPassword = it },
-                        label = { Text("Access Token (tk_...)", fontFamily = RubikFontFamily) },
+                        label = { Text("ntfy access token (tk_...)", fontFamily = RubikFontFamily) },
                         leadingIcon = {
                             Icon(Icons.Default.Key, contentDescription = null, tint = KaminariTheme.colors.textSecondary, modifier = Modifier.size(18.dp))
                         },

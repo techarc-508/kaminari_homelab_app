@@ -19,12 +19,20 @@ class ProxmoxClient:
         base_url: str,
         api_token: str,
         verify_tls: bool = True,
+        ca_cert: Optional[str] = None,
         timeout_seconds: float = 10.0,
     ):
         self.base_url = base_url.rstrip("/") + "/"
         self.api_token = api_token
         self.verify_tls = verify_tls
+        # A pinned CA path is stronger than verify=True: the Proxmox API is only
+        # trusted through the cluster's own CA, never through public roots.
+        self.ca_cert = ca_cert
         self.timeout_seconds = timeout_seconds
+
+    @property
+    def tls_verify(self) -> bool | str:
+        return self.ca_cert if self.ca_cert else self.verify_tls
 
     def _headers(self) -> Dict[str, str]:
         return {"Authorization": f"PVEAPIToken={self.api_token}"}
@@ -37,7 +45,7 @@ class ProxmoxClient:
     ) -> Any:
         url = urljoin(self.base_url, path.lstrip("/"))
         async with httpx.AsyncClient(
-            verify=self.verify_tls,
+            verify=self.tls_verify,
             timeout=self.timeout_seconds,
         ) as client:
             response = await client.request(

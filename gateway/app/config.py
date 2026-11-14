@@ -1,3 +1,4 @@
+from pathlib import Path
 from typing import Optional
 
 from pydantic import HttpUrl, field_validator
@@ -24,6 +25,10 @@ class Settings(BaseSettings):
     proxmox_base_url: HttpUrl
     proxmox_api_token: str
     proxmox_verify_tls: bool = True
+    # Path to the PEM CA that signed the Proxmox API certificate. When set it is
+    # the only trust anchor used for the Proxmox API, so verification stays on
+    # without trusting unrelated public roots.
+    proxmox_ca_cert: Optional[str] = None
     proxmox_timeout_seconds: float = 10.0
 
     # Mutations stay disabled unless explicitly enabled *and* step-up is enrolled.
@@ -44,6 +49,24 @@ class Settings(BaseSettings):
         if value.scheme != "https":
             raise ValueError("Proxmox base URL must use https://")
         return value
+
+    @field_validator("proxmox_ca_cert")
+    @classmethod
+    def require_readable_ca(cls, value: Optional[str]) -> Optional[str]:
+        if value is None or not value.strip():
+            return None
+        path = Path(value.strip())
+        if not path.is_file():
+            raise ValueError(f"proxmox CA certificate not found: {path}")
+        if "BEGIN CERTIFICATE" not in path.read_text(errors="replace"):
+            raise ValueError("proxmox CA certificate is not a PEM certificate")
+        return str(path)
+
+    def proxmox_tls_verify(self) -> bool | str:
+        """Value handed to httpx: the pinned CA path, else the verification flag."""
+        if self.proxmox_ca_cert:
+            return self.proxmox_ca_cert
+        return self.proxmox_verify_tls
 
     @field_validator("gateway_token")
     @classmethod

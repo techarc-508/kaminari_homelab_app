@@ -1,16 +1,16 @@
-# ntfy permission matrix
+# ntfy permission matrix (generated from contracts/kf_contract.v1.json)
 
-Before: no auth-file, `enable_login: false`, anonymous publish accepted on any topic.
+Apply with `ops/ntfy/generate_auth.py --apply`; verify with `ops/verify/ntfy_matrix.py`.
 
-After: `auth-file` + `auth-default-access: deny-all`.
+| Identity | Role | Topic permissions |
+|---|---|---|
+| `kaminari_app` | user | `kf-admin-audit` ro, `kf-backups` ro, `kf-command-request` wo, `kf-command-result` ro, `kf-diary` ro, `kf-digest` ro, `kf-iot` ro, `kf-music-pipeline` ro, `kf-music-reports` ro, `kf-network` ro, `kf-news-reports` ro, `kf-news` ro, `kf-ntfy` ro, `kf-pve-ct` ro, `kf-pve-host` ro, `kf-pve-vm` ro, `kf-security` ro, `kf-services` ro, `kf-stickers-pipeline` ro, `kf-stickers-reports` ro, `kf-storage` ro, `kf-web` ro |
+| `kf_gateway` | user | `kf-admin-audit` wo, `kf-command-request` ro, `kf-command-result` wo |
+| `kf_monitor` | user | `kf-backups` wo, `kf-digest` wo, `kf-network` wo, `kf-ntfy` wo, `kf-pve-ct` wo, `kf-pve-host` wo, `kf-pve-vm` wo, `kf-security` wo, `kf-services` wo, `kf-storage` wo, `kf-web` wo |
+| `kf_music` | user | `kf-music-pipeline` wo, `kf-music-reports` wo |
+| `kf_news` | user | `kf-news-reports` wo, `kf-news` wo |
+| `kf_stickers` | user | `kf-stickers-pipeline` wo, `kf-stickers-reports` wo |
+| `kfadmin` | admin | all topics (server-side only, never shipped in the app) |
+| anonymous `*` | anonymous | `KAMINARI-FUJI-Homelab` rw, `kaminari-diary` rw, `kaminari-onboarding-test` rw |
 
-| Identity | Access |
-|---|---|
-| `kfadmin` | admin (all topics, server-side only) |
-| `kaminari_app` | write: `kf-command-request`; read: `kf-admin-audit`, `kf-backups`, `kf-command-result`, `kf-diary`, `kf-digest`, `kf-iot`, `kf-music-pipeline`, `kf-music-reports`, `kf-network`, `kf-news`, `kf-news-reports`, `kf-ntfy`, `kf-pve-ct`, `kf-pve-host`, `kf-pve-vm`, `kf-security`, `kf-services`, `kf-stickers-pipeline`, `kf-stickers-reports`, `kf-storage`, `kf-web` |
-| `kf_gateway` | write: `kf-admin-audit`, `kf-command-result`; read: `kf-command-request` |
-| `kf_monitor` | write: `kf-backups`, `kf-digest`, `kf-network`, `kf-ntfy`, `kf-pve-ct`, `kf-pve-host`, `kf-pve-vm`, `kf-security`, `kf-services`, `kf-storage`, `kf-web` |
-| `kf_music` | write: `kf-music-pipeline`, `kf-music-reports` |
-| `kf_stickers` | write: `kf-stickers-pipeline`, `kf-stickers-reports` |
-| `kf_news` | write: `kf-news`, `kf-news-reports` |
-| anonymous `*` | rw: `KAMINARI-FUJI-Homelab`, `kaminari-diary`, `kaminari-onboarding-test`, `kf-command-result`, `rplab-command-results` |
+Command-result topics (`kf-command-result`, rplab-command-results) have no anonymous row and no `*` rule.

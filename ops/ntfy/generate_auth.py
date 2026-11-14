@@ -1,189 +1,202 @@
 #!/usr/bin/env python3
-"""Generate the additive ntfy auth file, server config and permission matrix.
+"""Reconcile ntfy's SQLite auth database with the kf- contract.
 
-The kf- model in contracts/kf_contract.v1.json is the single source of truth:
+ntfy 2.28 stores users, tokens and topic permissions in `auth.db` (SQLite), so
+the previous YAML generator produced a file the running server never read. This
+tool works on the real store:
 
-  * every kf-identity gets a token and exactly the access its contract entry
-    grants (writers write, readers read, nothing else);
-  * anonymous access is preserved for the three legacy topics and the legacy
-    command-reply topic so existing publishers keep working;
-  * everything else is deny-by-default.
-
-Outputs (never committed):
-  auth.yml      ntfy auth file with generated tokens
-  server.yml    ntfy server config referencing auth.yml
-  matrix.md     before/after permission matrix for review and rollback
+  * the contract (`contracts/kf_contract.v1.json`) is the only source of truth;
+  * identity -> topic permissions are derived deterministically from
+    `writers`/`readers`, plus anonymous access only for legacy topics that opt
+    in with `"anonymous": true`;
+  * command-result topics are never anonymous — no `*` row is generated for
+    them, and any stray `*` row is deleted;
+  * applying an identical contract is a no-op (idempotent);
+  * `--apply` writes a timestamped backup of `auth.db` first.
 
 Usage:
-  python3 generate_auth.py --contract contracts/kf_contract.v1.json --out /tmp/kf-ntfy
-  python3 generate_auth.py --contract ... --out ... --reuse-tokens  # keep existing tokens
+  # what would change (safe, read-only)
+  python3 ops/ntfy/generate_auth.py --db /path/to/auth.db
 
-`--reuse-tokens` reads an existing auth.yml in the output directory and keeps
-tokens already issued for an identity, so re-running the generator does not
-rotate credentials underneath running publishers.
+  # apply, then restart ntfy and run ops/verify/ntfy_matrix.py
+  python3 ops/ntfy/generate_auth.py --db /path/to/auth.db --apply
+
+The tool never prints or writes tokens. Tokens live in the DB and in the
+operator's `/opt/kaminari-ntfy/credentials.env`, never here.
 """
 
 from __future__ import annotations
 
 import argparse
 import json
-import re
-import secrets
-import string
+import shutil
+import sqlite3
+import time
 from pathlib import Path
 
-ALPHABET = string.ascii_letters + string.digits
-LEGACY_ANONYMOUS_TOPICS = None  # filled from the contract
+ANONYMOUS_USER = "*"
 
 
-def new_token() -> str:
-    return "tk_" + "".join(secrets.choice(ALPHABET) for _ in range(32))
+def load_contract(path: Path) -> dict:
+    return json.loads(path.read_text())
 
 
-def parse_existing(auth_path: Path) -> dict[str, str]:
-    """Extract identity -> token from an auth file we generated before."""
-    tokens: dict[str, str] = {}
-    if not auth_path.exists():
-        return tokens
-    current = None
-    for line in auth_path.read_text().splitlines():
-        match = re.match(r"^([a-zA-Z0-9_]+):\s*$", line)
-        if match:
-            current = match.group(1)
-            continue
-        token = re.match(r"^\s+-\s+(tk_[A-Za-z0-9]+)\s*$", line)
-        if token and current:
-            tokens.setdefault(current, token.group(1))
-    return tokens
+def desired_state(contract: dict) -> tuple[dict[str, str], list[tuple[str, str, int, int]]]:
+    """Return ({identity: role}, [(identity, topic, read, write)])."""
+    roles: dict[str, str] = {}
+    for identity in contract["identities"]:
+        roles[identity["name"]] = "admin" if identity.get("ntfyAdmin") else "user"
 
+    access: list[tuple[str, str, int, int]] = []
 
-def access_for(identity: str, topics: list[dict], write_topics: set[str], read_topics: set[str]) -> list[str]:
-    entries: list[str] = []
-    for topic in topics:
+    # Anonymous access is opt-in per legacy topic and never applies to kf- topics.
+    for topic in contract["legacyTopics"]:
+        if topic.get("anonymous"):
+            access.append((ANONYMOUS_USER, topic["id"], 1, 1))
+
+    admins = {name for name, role in roles.items() if role == "admin"}
+    for topic in contract["topics"]:
         tid = topic["id"]
-        if tid in write_topics and tid in read_topics:
-            permission = "rw"
-        elif tid in write_topics:
-            permission = "wo"
-        elif tid in read_topics:
-            permission = "ro"
-        else:
+        for writer in topic["writers"]:
+            if writer not in admins:
+                access.append((writer, tid, 0, 1))
+        for reader in topic["readers"]:
+            if reader not in admins:
+                access.append((reader, tid, 1, 0))
+
+    # An identity that both reads and writes the same topic collapses to rw.
+    merged: dict[tuple[str, str], list[int]] = {}
+    for identity, topic, read, write in access:
+        slot = merged.setdefault((identity, topic), [0, 0])
+        slot[0] = max(slot[0], read)
+        slot[1] = max(slot[1], write)
+    return roles, [(i, t, r, w) for (i, t), (r, w) in sorted(merged.items())]
+
+
+def read_live(db: sqlite3.Connection) -> tuple[dict[str, str], dict[str, str], dict[tuple[str, str], tuple[int, int]]]:
+    users = {row[1]: row[0] for row in db.execute("SELECT id, user FROM user")}
+    ids = {row[0]: row[1] for row in db.execute("SELECT id, user FROM user")}
+    access = {
+        (ids[row[0]], row[1]): (int(row[2]), int(row[3]))
+        for row in db.execute("SELECT user_id, topic, read, write FROM user_access")
+        if row[0] in ids
+    }
+    return users, ids, access
+
+
+def diff(
+    roles: dict[str, str],
+    desired: list[tuple[str, str, int, int]],
+    users: dict[str, str],
+    access: dict[tuple[str, str], tuple[int, int]],
+) -> tuple[list[str], list[tuple[str, str]], list[tuple[str, str, int, int]], list[tuple[str, str]]]:
+    missing_users = sorted(name for name in roles if name not in users)
+    wanted = {(i, t): (r, w) for i, t, r, w in desired}
+    add = [(i, t, r, w) for (i, t), (r, w) in wanted.items() if (i, t) not in access and i in users]
+    update = [
+        (i, t, r, w)
+        for (i, t), (r, w) in wanted.items()
+        if (i, t) in access and access[(i, t)] != (r, w) and i in users
+    ]
+    remove = [(i, t) for (i, t) in access if (i, t) not in wanted]
+    return missing_users, sorted(remove), sorted(add), sorted(update)
+
+
+def render_matrix(contract: dict, roles: dict[str, str], desired: list[tuple[str, str, int, int]]) -> str:
+    by_identity: dict[str, list[str]] = {}
+    for identity, topic, read, write in desired:
+        if identity == ANONYMOUS_USER:
             continue
-        entries.append(f"  - \"{identity}:{tid}:{permission}\"")
-    return entries
+        label = "rw" if read and write else ("ro" if read else "wo")
+        by_identity.setdefault(identity, []).append(f"`{topic}` {label}")
+    lines = [
+        "# ntfy permission matrix (generated from contracts/kf_contract.v1.json)",
+        "",
+        "Apply with `ops/ntfy/generate_auth.py --apply`; verify with `ops/verify/ntfy_matrix.py`.",
+        "",
+        "| Identity | Role | Topic permissions |",
+        "|---|---|---|",
+    ]
+    for name in sorted(roles):
+        if roles[name] == "admin":
+            lines.append(f"| `{name}` | admin | all topics (server-side only, never shipped in the app) |")
+            continue
+        topics = sorted(by_identity.get(name, []))
+        lines.append(f"| `{name}` | user | {', '.join(topics) if topics else 'none'} |")
+    legacy_anon = [t["id"] for t in contract["legacyTopics"] if t.get("anonymous")]
+    lines.append(
+        "| anonymous `*` | anonymous | "
+        + (", ".join(f"`{t}` rw" for t in legacy_anon) if legacy_anon else "none")
+        + " |"
+    )
+    lines.append("")
+    lines.append("Command-result topics (`{}`, {}) have no anonymous row and no `*` rule.".format(
+        contract["commandReplyTopic"], ", ".join(contract["legacyCommandReplyTopics"])
+    ))
+    return "\n".join(lines) + "\n"
 
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--contract", required=True, type=Path)
-    parser.add_argument("--out", required=True, type=Path)
-    parser.add_argument("--reuse-tokens", action="store_true")
-    parser.add_argument("--cache-dir", default="/var/lib/ntfy")
+    parser.add_argument("--contract", type=Path, default=Path("contracts/kf_contract.v1.json"))
+    parser.add_argument("--db", type=Path, required=True, help="path to ntfy auth.db")
+    parser.add_argument("--apply", action="store_true", help="write the diff (backs up auth.db first)")
+    parser.add_argument("--matrix", type=Path, help="optional path to write the permission matrix")
     args = parser.parse_args()
 
-    contract = json.loads(args.contract.read_text())
-    topics = contract["topics"]
-    identities = contract["identities"]
-    legacy = [t["id"] for t in contract["legacyTopics"]]
-    reply_topics = [contract["commandReplyTopic"], *contract["legacyCommandReplyTopics"]]
+    contract = load_contract(args.contract)
+    roles, desired = desired_state(contract)
 
-    args.out.mkdir(parents=True, exist_ok=True)
-    auth_path = args.out / "auth.yml"
-    existing = parse_existing(auth_path) if args.reuse_tokens else {}
+    db = sqlite3.connect(args.db)
+    try:
+        users, _ids, access = read_live(db)
+        missing_users, remove, add, update = diff(roles, desired, users, access)
 
-    # writer/reader sets straight from the contract
-    writes: dict[str, set[str]] = {i["name"]: set() for i in identities}
-    reads: dict[str, set[str]] = {i["name"]: set() for i in identities}
-    for topic in topics:
-        for writer in topic["writers"]:
-            writes.setdefault(writer, set()).add(topic["id"])
-        for reader in topic["readers"]:
-            reads.setdefault(reader, set()).add(topic["id"])
-    # the Android identity additionally needs to read everything it is a reader of,
-    # and it may write command requests plus its own reply topic read.
-    reads.setdefault("kaminari_app", set()).add(contract["commandReplyTopic"])
-    reads["kaminari_app"].add(contract["commandReplyTopic"])
+        print(f"identities in contract : {len(roles)}")
+        print(f"live identities        : {len([u for u in users if u != ANONYMOUS_USER])}")
+        print(f"desired grants         : {len(desired)}")
+        print(f"missing identities     : {missing_users or 'none'}")
+        print(f"grants to add          : {len(add)}")
+        print(f"grants to update       : {len(update)}")
+        print(f"grants to remove       : {len(remove)}")
+        for identity, topic in remove:
+            print(f"  remove {identity}:{topic}")
+        for identity, topic, read, write in add:
+            print(f"  add    {identity}:{topic}:{'rw' if read and write else ('ro' if read else 'wo')}")
 
-    lines: list[str] = [
-        "# Generated by ops/ntfy/generate_auth.py from contracts/kf_contract.v1.json.",
-        "# Contains bearer tokens: never commit, never paste into reports.",
-        "# Anonymous access is limited to the legacy topics listed below.",
-        "",
-    ]
-    issued: dict[str, str] = {}
-    for identity in identities:
-        name = identity["name"]
-        token = existing.get(name) or new_token()
-        issued[name] = token
-        lines.append(f"{name}:")
-        if identity.get("ntfyAdmin"):
-            lines.append("  role: admin")
-        lines.append("  tokens:")
-        lines.append(f"    - {token}")
-        lines.append("")
+        matrix = render_matrix(contract, roles, desired)
+        if args.matrix:
+            args.matrix.write_text(matrix)
+            print(f"matrix written         : {args.matrix}")
 
-    access: list[str] = []
-    access.append("access:")
-    # legacy preservation: anonymous keeps read-write on legacy topics only
-    for topic in legacy:
-        access.append(f"  - \"*:{topic}:rw\"")
-    for topic in reply_topics:
-        access.append(f"  - \"*:{topic}:rw\"")
-    for identity in identities:
-        name = identity["name"]
-        if identity.get("ntfyAdmin"):
-            continue  # admin role bypasses per-topic access
-        write_topics = writes.get(name, set())
-        read_topics = reads.get(name, set())
-        access.extend(access_for(name, topics, write_topics, read_topics))
+        if not args.apply:
+            print("dry run — pass --apply to write")
+            return 0
+        if missing_users:
+            print("refusing to apply: create the missing identities with `ntfy user add` first")
+            return 2
 
-    auth_path.write_text("\n".join(lines + access) + "\n")
+        backup = args.db.with_suffix(f".db.bak-{time.strftime('%Y%m%d%H%M%S')}")
+        shutil.copy2(args.db, backup)
+        print(f"backup                 : {backup}")
 
-    server = f"""# Generated by ops/ntfy/generate_auth.py. Additive: legacy anonymous topics stay open.
-base-url: "http://192.168.0.104:8201"
-listen-http: ":80"
-cache-file: "{args.cache_dir}/cache.db"
-cache-duration: "24h"
-auth-file: "{args.cache_dir}/auth.yml"
-auth-default-access: "deny-all"
-behind-proxy: false
-enable-signup: false
-enable-login: true
-"""
-    (args.out / "server.yml").write_text(server)
-
-    # permission matrix (no tokens)
-    matrix: list[str] = [
-        "# ntfy permission matrix",
-        "",
-        "Before: no auth-file, `enable_login: false`, anonymous publish accepted on any topic.",
-        "",
-        "After: `auth-file` + `auth-default-access: deny-all`.",
-        "",
-        "| Identity | Access |",
-        "|---|---|",
-    ]
-    for identity in identities:
-        name = identity["name"]
-        if identity.get("ntfyAdmin"):
-            matrix.append(f"| `{name}` | admin (all topics, server-side only) |")
-            continue
-        parts = sorted(writes.get(name, set()))
-        reads_ = sorted(reads.get(name, set()))
-        detail = []
-        if parts:
-            detail.append("write: " + ", ".join(f"`{t}`" for t in parts))
-        if reads_:
-            detail.append("read: " + ", ".join(f"`{t}`" for t in reads_))
-        matrix.append(f"| `{name}` | {'; '.join(detail) or 'no access'} |")
-    matrix.append(f"| anonymous `*` | rw: {', '.join(f'`{t}`' for t in legacy + reply_topics)} |")
-    (args.out / "matrix.md").write_text("\n".join(matrix) + "\n")
-
-    print(f"auth.yml    {auth_path} ({len(issued)} identities)")
-    print(f"server.yml  {args.out / 'server.yml'}")
-    print(f"matrix.md   {args.out / 'matrix.md'}")
-    print("tokens issued:", ", ".join(sorted(issued)))
-    return 0
+        with db:
+            for identity, topic in remove:
+                db.execute("DELETE FROM user_access WHERE user_id=? AND topic=?", (users[identity], topic))
+            for identity, topic, read, write in add:
+                db.execute(
+                    "INSERT INTO user_access (user_id, topic, read, write, provisioned) VALUES (?,?,?,?,0)",
+                    (users[identity], topic, read, write),
+                )
+            for identity, topic, read, write in update:
+                db.execute(
+                    "UPDATE user_access SET read=?, write=? WHERE user_id=? AND topic=?",
+                    (read, write, users[identity], topic),
+                )
+        print("applied                : restart the ntfy container so it reloads auth.db")
+        return 0
+    finally:
+        db.close()
 
 
 if __name__ == "__main__":

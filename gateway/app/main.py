@@ -46,6 +46,7 @@ proxmox = ProxmoxClient(
     base_url=str(settings.proxmox_base_url),
     api_token=settings.proxmox_api_token,
     verify_tls=settings.proxmox_verify_tls,
+    ca_cert=settings.proxmox_ca_cert,
     timeout_seconds=settings.proxmox_timeout_seconds,
 )
 

@@ -23,7 +23,7 @@ Official references: <https://docs.ntfy.sh/subscribe/api/>, <https://docs.ntfy.s
 
 CR/LF is stripped from credentials before header construction. Credentials are held only in memory for the request; the encrypted envelope is in `SecretStore`.
 
-The live owner server has auth disabled, so Guest is the correct mode. If auth is enabled later, create a non-admin `kaminari_app` token scoped to the approved topics; never use an admin token in the app.
+The live server has authentication enabled and deny-by-default: Guest can only reach the three legacy topics. The app must use the non-admin `kaminari_app` access token (`tk_…` from `/opt/kaminari-ntfy/credentials.env`) over `https://ntfy.rplab.qzz.io`; never use an admin token, and never configure the app with a gateway token.
 
 ## Stream behavior
 

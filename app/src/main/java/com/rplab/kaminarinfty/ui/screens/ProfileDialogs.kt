@@ -330,7 +330,7 @@ fun AddProfileDialog(
                         onValueChange = { secret = it },
                         label = {
                             Text(
-                                if (authMethod == AuthMethod.ACCESS_TOKEN) "Access token"
+                                if (authMethod == AuthMethod.ACCESS_TOKEN) "ntfy access token"
                                 else "Password",
                                 fontFamily = RubikFontFamily,
                             )

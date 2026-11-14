@@ -1,6 +1,6 @@
 # Progress — Kaminari Nfty V1
 
-**Last updated:** 2026-11-10
+**Last updated:** 2026-11-12 (Freebuff Workstream B Phase 0 appended)
 **Repository:** `KaminariNfty_V1_Plan/repo/kaminari_homelab_app-main`
 **Branch:** `main`
 **HEAD before Phase 3 checkpoint:** `5d00827` — Phase 2 remediation
@@ -421,3 +421,61 @@ validation; live Proxmox validation.
 - Public GitHub publication and final hashes are recorded in `STAGE_6_PUBLICATION_AND_DOCUMENTATION_REPORT.md` and `FINAL_APK_DELIVERY_REPORT.md`.
 
 **Open:** physical-device validation, production signing, gateway deployment, ntfy auth/token enablement.
+
+## Ntfy Redesign Stage 1 — 2026-11-12
+
+**Scope:** backup recovery, storage diagnosis, PVE notification repair, Freebuff handover. Read-only except the PVE notification body fix.
+
+- Exact archive inventory: **12 archives / 124.802 GiB**, 12 logs; no incomplete artifacts. Manifest: `OLD_BACKUP_DELETION_MANIFEST.md`.
+- **No archive deleted.** Deletion is blocked pending one exact owner confirmation and a storage decision.
+- Failure diagnosis: CT104 `zstd error 70: Disk quota exceeded`; VM200 `vma_queue_write: Broken pipe` at 76 %; both caused by the 150 GiB target being ~83 % full.
+- Storage: single ST500DM002 HDD, 29,108 power-on hours, `Reported_Uncorrect` 11,773, ZFS ONLINE/clean. **Not a trustworthy sole backup target.**
+- PVE webhook 400 repaired: full task log exceeded ntfy's 4,095-byte message limit; body reduced to `{{ title }}`. PVE test delivered to `kaminari-onboarding-test` (`nftxG2l4pqiS`); production URL restored.
+- Baseline 2026-11-12 is **partial**: CT100–CT103 OK; CT104/VM200 missing. Trustworthy baseline **blocked** pending Option A/B/C in `BACKUP_BASELINE_PLAN.md`.
+- Freebuff handover: `FREEBUFF_IMPLEMENTATION_MASTER_PLAN.md`, 22-topic catalogue, ACL matrix, Level 4 control-plane spec, music/sticker/news contracts.
+- No account, token, topic, ACL, service restart, proxy, firewall or guest change was made.
+
+## Freebuff Workstream B — Phase 0 reconciliation (2026-11-12)
+
+**Status: COMPLETE — PASS WITH CONDITIONS. No implementation started; stopped for owner review.**
+
+- Read the full repository, the plan-folder mirror, the discovery set and every approved redesign specification.
+- Re-verified the live ntfy surface read-only: `https://ntfy.rplab.qzz.io` health **200**, config **auth disabled**, stats **688 messages**, legacy `nfty` host **502**, TLS valid to 2026-12-25.
+- Confirmed **none of the 22 `kf-` topics exists** and no production code uses a `kf-` name. The three legacy topics remain active.
+- Baseline re-run: Android **361 tests, 0 failures, 2 skipped**; gateway **9 passed**. No source changed.
+- Produced: `FREEBUFF_PHASE0_RECONCILIATION.md`, `LIVE_NTFY_INVENTORY.md`, `TOPIC_MIGRATION_MATRIX.md`, `GATEWAY_GAP_ANALYSIS.md`, `ANDROID_WEB_GAP_ANALYSIS.md`.
+- Handover reports mirrored to `/home/pushpal/Desktop/freebuff_output/`: `00_MASTER_STATUS.md`, `01_PHASE_0_REPORT.md`, `LATEST_HANDOVER.md`, `COMMAND_LOG.md`, `DECISIONS.md`, `BLOCKERS.md`.
+- Key conflicts recorded (not silently resolved): `rplab-` vs `kf-` in older discovery docs; **ntfy ACLs are per user, so the Android and gateway tokens cannot hold different permissions under one `kaminari_app` user**; gateway approval is a nonce echo, not step-up; replay/audit are volatile; the Android action catalogue and `rplab-command-results` reply topic do not match the gateway; no web frontend exists.
+- Implementation matrix: Android client foundation and gateway read slice are real and tested; the 22-topic/ACL model, Level 4 destructive catalogue, pipeline integrations, owner dashboard, audit history and web console are **documented only**.
+- Phase 1 (models, schemas, migrations, contract tests; production untouched) can start after owner decisions P-01…P-03. Phase 5 migration remains blocked by P-02, P-04…P-09 and the Workstream A backup/storage blockers.
+- **No topic, account, token, ACL, code, dependency, guest, service or production configuration was changed.**
+
+## Backup Workstream A — Phase A discovery (2026-11-12)
+
+**Status: COMPLETE — PASS WITH CONDITIONS. No implementation.**
+
+- Verified SSD primary candidate: `nvme0n1` **XPG GAMMIX S11 Pro**, 238.47 GiB, SMART PASSED, 11 % wear, 9,218 h, 0 media errors; currently active PVE `lvmthin` (`fast-data-ssd/data`, 238.24 GiB, 0 % data).
+- Verified HDD secondary: `sda` **ST500DM002-1BD142**, 465.8 GiB, ZFS `safedrive` ONLINE/scrub clean, 29,127 h, `Reported_Uncorrect` 11,773; `backup-hdd` 150 GiB quota at 124.87 GiB used.
+- Latest per-guest generation: **66.600 GiB** (CT104 33.809 GiB from 2026-10-20; VM200 28.043 GiB from 2026-11-10; others 0.275–3.216 GiB).
+- **3 SSD generations are not safe** at 20 % reserve: 199.8 GiB on ~235 GiB usable = ~85 % used. **2 generations recommended.**
+- **2 HDD generations fit after cleanup**, but two old + one new (199.8 GiB) exceed the 150 GiB quota. Raise to 220–240 GiB or accept a transient one-generation copy.
+- HDD is same physical pool as downloads/Immich/VM disk and is **not disaster recovery**; off-site remains mandatory.
+- CT104 has four `backup=0` bind mounts; its archive is rootfs-only. Immich/Docker database consistency is not application-aware.
+- Exact deliverables: `BACKUP_DEVICE_DISCOVERY.md`, `BACKUP_GUEST_INVENTORY.md`, `BACKUP_CAPACITY_MODEL.md`, `BACKUP_ARCHITECTURE_PROPOSAL.md`, `BACKUP_RISK_REGISTER.md`, `BACKUP_PHASE_A_REPORT.md`.
+- No device formatted, no LV created, no storage changed, no backup run, no archive deleted, no schedule changed.
+- **Phase B blocked** on owner capacity/retention/quota decisions. Old 12 archives remain **not authorized for deletion**.
+
+## Freebuff Workstream B — Phase 1 (2026-11-12)
+
+**Status: COMPLETE — PASS WITH CONDITIONS. Stopped for owner review.**
+
+- Locked P-01/P-02/P-03 applied: `kf-` canonical with **22 topics** and no `kf-builds`; separate non-admin **`kf_gateway`** identity; **Option B** administration (full Android UI, gateway-backed, no admin credential in the APK).
+- Added the authoritative cross-language contract `contracts/kf_contract.v1.json` (22 topics, 7 identities, 14 actions, legacy topic rules, reply-topic constants).
+- Added Kotlin `contract/KfCatalog.kt` (typed catalogue/identity permissions) and `contract/KfPayloads.kt` (12 typed payload models with validation). Kotlin and Python tests assert parity with the JSON.
+- Room **v3**: additive `category`/`priority` on subscriptions, explicit `MIGRATION_2_3`, schema `3.json`. `Migration1To3Test` starts from the real `1.json`; `Migration2To3Test` starts from the real `2.json` and asserts defaults, row preservation and reopen.
+- Android command policy aligned to the 14-action catalogue; canonical reply topic is **`kf-command-result`** with the legacy `rplab-command-results` accepted only for correlation.
+- Added `admin/AdminContract.kt` and `ui/screens/AdminScreen.kt`; `ADMIN` destination reachable from Settings. Every capability is honestly `PLANNED`/`GATEWAY_REQUIRED`; `UnavailableGatewayAdminService` is the production default and executes nothing.
+- Moved `NtfyAdminClient` out of `src/main` to `src/test` as `NtfyAdminFixture`; a source-scan regression test fails if `/v1/access`, `/v1/users` or the client returns to production sources.
+- Gateway: contract-driven catalogue/authorization, identity from `gateway_identity` (default `kf_gateway`), typed JSON errors, correlation/audit IDs, reply-topic allowlist, exact arg validation, bounded in-memory audit and idempotency, and an explicit non-step-up approval marker.
+- **Verified:** `:app:testDebugUnitTest --rerun-tasks` **396 tests / 0 failures / 0 errors / 2 skipped**, exit 0; gateway `pytest -q` **22 passed**, exit 0; `:app:assembleDebug` SUCCESS (APK 20,308,879 B); `:app:lintDebug` **0 errors / 57 warnings**; `git diff --check` exit 0.
+- **Not done:** no gateway deployment, no live topic/user/token/ACL change, no message published, no durable audit/idempotency, no real step-up, no implemented admin operations, no topic seeding, no device migration test.

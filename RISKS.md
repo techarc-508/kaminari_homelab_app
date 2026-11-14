@@ -1,6 +1,6 @@
 # Risk Register — Kaminari Nfty V1
 
-**Last updated:** 2026-11-09 (Phase 3 accepted; Phase 4 Stage A complete)
+**Last updated:** 2026-11-12 (Freebuff Workstream B Phase 0 additions, R-41…R-52)
 Severity reflects user impact; state reflects what is verified.
 
 | ID | Risk | Severity | State / mitigation |
@@ -37,3 +37,61 @@ Severity reflects user impact; state reflects what is verified.
 | R-29 | **Release is test-only signed.** Not a production/Play Store identity. | Medium | Accepted for owner evaluation; generate a production key before distribution. |
 | R-30 | **LAN HTTP origin is unusable by the app.** `http://<private-ntfy-lan>:8201` is CLI-only because the app enforces HTTPS and Android denies cleartext. | Low | Use the public HTTPS URL; do not weaken TLS for LAN convenience. |
 | R-31 | **Old `nfty` hostname returns 502.** Cached configs may still point at it. | Medium | Use `ntfy.rplab.qzz.io`; update any remaining client configs. |
+| R-32 | **Backup target is a single aging HDD** (29,108 h; 11,773 reported uncorrectable events; no redundancy). | **High** | Do not rely on it as the only copy. Add a healthy second target and off-site copy; run restore drills. |
+| R-33 | **Backups for CT104 and VM200 are stale/failing** because the 150 GiB target is ~83 % full. | **High** | Diagnosed; do not delete the old archives until a replacement target is verified. See `BACKUP_BASELINE_PLAN.md`. |
+| R-34 | **No verified off-site backup exists.** | **High** | A local second disk is not disaster recovery. Add an external destination and test a restore. |
+| R-35 | **ntfy is public and unauthenticated**; anyone with a topic name can read or publish. | **High** | Enable auth/ACLs only after every producer is migrated; never enable default-deny blindly. |
+| R-36 | **PVE email fallback is broken** (Postfix bounces to an old Gmail address). | Medium | Fix the recipient or remove the fallback; do not rely on email as the only alert path. |
+| R-37 | **CT104 backup excludes bind-mounted application data** (`backup=0` on downloads, backup, Immich drive, annotations). | **High** | Document the gap; back up those datasets separately; do not call the CT104 archive a full application backup. |
+| R-38 | **Natural-language control plane could be mistaken for arbitrary command execution.** | **High** (Freebuff) | Only typed, allowlisted operations; no shell/SQL/URL; preview, step-up, audit. |
+| R-39 | **Gateway write scope could be widened too early.** | **High** (Freebuff) | Keep the current PVE token read-only until each typed mutation is implemented and tested; separate write token with least privilege. |
+| R-40 | **Old exposed passwords remain compromised.** | **High** | Rotate PVE root, Mint sudo and GitHub PAT; never reuse them in the redesign. |
+
+## Freebuff Workstream B — Phase 0 additions (2026-11-12)
+
+| ID | Risk | Severity | State / mitigation |
+|---|---|---|---|
+| R-41 | **ntfy ACLs are per user, not per token.** `kaminari_app` cannot have different Android and gateway permissions; splitting them under one user is impossible. | **Critical** | Open. Decision P-02 required before any ACL is applied. Do not assume token-level isolation. |
+| R-42 | **Gateway approval is a nonce echo.** Possession of the shared bearer token is enough to mutate; no second factor or independent approval exists. | **Critical** | Open. Mutations must stay disabled; implement real step-up (P-06) before use. |
+| R-43 | **Gateway replay protection and audit are volatile.** A process restart clears the replay cache; audit is a log line, not durable. | **High** | Open. Persist idempotency and an append-only audit store (P-05). |
+| R-44 | **Namespace conflict in older documents.** Discovery docs and the priority standard still say `rplab-*`; following them creates topics no producer uses. | **High** | Open. Approved set is `kf-`; reconcile documents (P-01). |
+| R-45 | **Android and gateway command catalogues do not match**, and the app reply topic is `rplab-command-results`. | **High** | Open. Reconciling contracts is Phase 1; real execution remains impossible until fixed. |
+| R-46 | **The app seeds no topics.** A fresh install receives nothing until the user adds a topic; sample names are not live. | **Medium** | Open. Migration must seed the approved catalogue explicitly. |
+| R-47 | **No web frontend exists.** A web control plane cannot reuse any current UI or API contract. | **Medium** | Accepted as scope; do not start it before the gateway identity and read catalogue are stable. |
+| R-48 | **Admin-capable `NtfyAdminClient` ships in the APK** (unwired, accepts an admin credential at runtime). | **High** | Open. Remove or release-gate per P-03. |
+| R-49 | **Gateway has untyped raw PVE passthrough routes** (`/v1/proxmox/*`) outside the typed catalogue, risk model and audit. | **High** | Open. Every route must go through the typed layer in Phase 2. |
+| R-50 | **Accessing ntfy via the live server shows auth disabled and no persistent cache.** A restart loses cached messages; the app must keep Room as the source of truth. | **High** | Confirmed live 2026-11-12. Do not treat ntfy as durable history or an audit store. |
+| R-51 | **Reserved/dormant topics can drift into partial use.** `kf-iot` has no producer; `kf-stickers-*` has no pipeline. | **Medium** | Open. Create them denied or defer; never claim implementation without a real publisher. |
+| R-52 | **Live migration can silently break all alerts.** Every current producer is anonymous and `auth-default-access=deny-all` would cut them off. | **Critical** | Mitigated only by the staged migration in `TOPIC_MIGRATION_MATRIX.md`; requires owner approval and rollback evidence. |
+
+## Backup Workstream A — Phase A additions (2026-11-12)
+
+| ID | Risk | Severity | State / mitigation |
+|---|---|---|---|
+| BR-01 | Three SSD generations exceed the 20 % reserve (199.8 GiB on ~235 GiB usable). | **High** | Open; approve 2 generations or a documented 3-generation exception with growth cap. |
+| BR-02 | 150 GiB HDD quota cannot stage two old + one new (199.8 GiB). | **High** | Open; raise to 220–240 GiB or accept transient one-generation copy. |
+| BR-03 | HDD shares the physical pool with downloads, Immich and a VM disk. | **Critical** | Open; secondary only; off-site required. |
+| BR-04 | HDD has 29,127 h and 11,773 reported uncorrectable events. | **High** | Open; replace/demote; SMART/scrub monitoring; verify every copy. |
+| BR-05 | No verified off-site backup. | **Critical** | Open; encrypted off-site target and restore test required. |
+| BR-06 | Existing archives have no checksums or restore proof. | **High** | Open; SHA-256, format test, manifest, restore drill. |
+| BR-07 | CT104 archive excludes four bind-mounted datasets. | **Critical** | Open; separate dataset/application backup. |
+| BR-08 | Immich/Docker databases are crash-consistent only. | **High** | Open; application-aware dumps/quiesce. |
+| BR-10 | SSD carve-out consumes the empty `fast-data` pool. | **Medium** | Open; approve LV size and future-guest trade-off. |
+| BR-11 | SSD namespace utilization is 192 GB despite 0 % thin-pool data. | **Medium** | Open; investigate/benchmark before relying on full capacity. |
+| BR-14 | PVE `prune-backups` and a custom script could both delete. | **High** | Open; disable/neutralize PVE storage pruning before automation. |
+| BR-16 | The PVE notification 400 fix has not been exercised by a real post-fix backup. | **High** | Open; confirm a real job reaches ntfy. |
+| BR-19 | Restore could overwrite a running guest if a VMID is reused. | **High** | Open; restore to new VMID/isolated bridge; explicit confirmation. |
+
+## Freebuff Workstream B — Phase 1 additions (2026-11-12)
+
+| ID | Risk | Severity | State / mitigation |
+|---|---|---|---|
+| R-53 | **Contract drift** between the JSON contract and Kotlin/Python constants | High | Mitigated in Phase 1: both runtimes load or test against `contracts/kf_contract.v1.json`. Any future constant must update the contract and parity tests. |
+| R-54 | **P-02 is only modelled, not live.** No `kf_gateway` ntfy identity/token/ACL exists. | Critical | Open until Phase 5 creates and verifies them; do not claim the split is enforced on the server. |
+| R-55 | **Gateway approval remains nonce echo**, now explicitly `is_step_up = False`. | Critical | Open; mutations stay disabled by default. P-06 required before enabling any mutation. |
+| R-56 | **Audit and idempotency are in memory** (`durable = False`). | High | Open; not restart-safe or a system of record. P-05 required before trusting mutations. |
+| R-57 | **Admin boundary has no production implementation.** `UnavailableGatewayAdminService` is the default and every capability is planned/gateway-required. | Medium | Accepted for Phase 1; the UI cannot fake execution. Implement typed operations in Phase 2. |
+| R-58 | **Raw PVE read routes still exist** and are only identity-read-checked. | High | Open; Phase 2 must remove them or route every call through the typed catalogue. |
+| R-59 | **Room v3 migration is verified on Robolectric only**, not on a device with a real v2 database. | Medium | Open; add a device upgrade test before release. |
+| R-60 | **Legacy reply topic remains accepted** for correlation. | Low | Accepted deliberately for staged migration; remove only after all producers use `kf-command-result`. |
+| R-61 | **No topic seeding in the app**: the catalogue is modelled but a fresh install still receives nothing. | Medium | Open; seed without changing production topics in a later approved phase. |

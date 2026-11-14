@@ -1,6 +1,6 @@
 # TODO — Kaminari Nfty V1
 
-**Updated:** 2026-11-10, after Stage D completed and was checkpointed.
+**Updated:** 2026-11-12, after the Freebuff Workstream B Phase 0 reconciliation.
 Phase 4 is authorised through **Stage D**; Stages E–F require owner approval at the Stage D gate.
 
 ## Phase 3 closure (owner/device required)
@@ -178,3 +178,88 @@ Phase 3 is accepted as **PASS WITH CONDITIONS**. These conditions are still open
 - [ ] Production signing key.
 - [ ] Gateway deployment/TLS.
 - [ ] ntfy authentication enablement and app token.
+
+## Ntfy redesign Stage 1 — 2026-11-12
+
+- [x] Exact PVE backup archive inventory and deletion manifest.
+- [x] Storage/SMART/ZFS capacity diagnosis.
+- [x] CT104/VM200 backup failure diagnosis.
+- [x] PVE notification HTTP 400 cause and repair.
+- [x] 22-topic catalogue without `kf-builds`.
+- [x] ACL matrix, admin/gateway authorization model and Level 4 spec.
+- [x] Music, stickers and news notification contracts.
+- [x] Freebuff implementation master plan.
+- [ ] Owner confirms exact archive deletion manifest (`Scope A` or `A+B`).
+- [ ] Owner selects backup target Option A, B or C.
+- [ ] Complete six-guest backup baseline and verify every archive.
+- [ ] Add a verified off-site backup destination.
+- [ ] Freebuff: identity/ACL provisioning, 22 topics, monitoring, gateway, Android control centre.
+
+## Freebuff Workstream B — Phase 0 reconciliation (2026-11-12)
+
+- [x] Read all existing plans, phase reports, discovery documents and approved specifications.
+- [x] Inspect the Android, gateway, Room, delivery and command code paths.
+- [x] Re-probe the live ntfy endpoint read-only (health, config, stats, DNS, TLS).
+- [x] Re-run the baseline test suites (Android 361/0/0/2; gateway 9 passed).
+- [x] Produce `FREEBUFF_PHASE0_RECONCILIATION.md`.
+- [x] Produce `LIVE_NTFY_INVENTORY.md`.
+- [x] Produce `TOPIC_MIGRATION_MATRIX.md`.
+- [x] Produce `GATEWAY_GAP_ANALYSIS.md`.
+- [x] Produce `ANDROID_WEB_GAP_ANALYSIS.md`.
+- [x] Record findings C-01…C-22 and pending owner decisions P-01…P-09.
+- [ ] **Owner review of Phase 0 and explicit approval before Phase 1.**
+
+### Phase 0 findings that must be resolved before implementation
+
+- [ ] P-01: confirm `kf-` supersedes `rplab-` in every document, including the discovery set and priority standard.
+- [ ] P-02: resolve the Android/gateway token split (ntfy ACLs are per user, not per token).
+- [ ] P-03: decide whether an admin-capable `NtfyAdminClient` may ship in the APK.
+- [ ] P-04: choose a gateway deployment host/TLS path, or keep the command centre mock-only.
+- [ ] P-05: approve a durable local audit store; ntfy is not an audit system of record.
+- [ ] P-06: replace nonce-echo approval with real step-up reauthentication.
+- [ ] P-07: resolve `kf-diary` write ownership (`kf_stickers` grant vs stickers contract).
+- [ ] P-08: decide `kf-iot` ACL now, or create it denied until a real producer exists.
+- [ ] P-09: add legacy-test-topic access for `kaminari_app` to the migration/ACL test plan.
+
+### Phase 1 (safe, no production infrastructure) — COMPLETE, PASS WITH CONDITIONS
+
+- [x] Typed `kf-` topic catalogue and pipeline payload models.
+- [x] Room `MIGRATION_2_3` for topic category/priority, tested from `1.json` and `2.json`.
+- [x] Topic-mapping and ACL-expectation contract tests.
+- [x] Music/news/stickers payload schemas and validation tests.
+- [x] Fix `COMMAND_REPLY_TOPIC` to `kf-command-result` with a contract test and legacy allowance.
+- [x] Align the Android and gateway action catalogues (14 actions).
+- [x] Remove `NtfyAdminClient` from production sources; keep it as a test fixture (P-03 Option B).
+- [x] Add the honest gateway-backed administration contract and `ADMIN` destination.
+- [x] Stop for owner review after Phase 1.
+
+### Phase 1 conditions carried into Phase 2
+
+- [ ] Deploy on the P-04 host/TLS path or explicitly remain mock-only.
+- [ ] Implement real step-up authentication (P-06); keep mutations disabled until verified.
+- [ ] Make audit and idempotency durable (P-05).
+- [ ] Implement typed administration operations behind `GatewayAdminService`.
+- [ ] Remove or fully type the raw PVE read routes (B-21).
+- [ ] Add a physical-device Room v2→v3 upgrade test (B-20).
+- [ ] Seed the approved catalogue locally without changing live topics.
+- [ ] Obtain explicit owner authorisation before any Phase 2 work.
+
+## Backup Workstream A — Phase A (2026-11-12)
+
+- [x] Read project documentation and existing Stage 1 audit findings.
+- [x] Inventory actual devices, storage, guests, archives and current backup jobs.
+- [x] Measure latest per-guest generation and capacity.
+- [x] Produce `BACKUP_DEVICE_DISCOVERY.md`.
+- [x] Produce `BACKUP_GUEST_INVENTORY.md`.
+- [x] Produce `BACKUP_CAPACITY_MODEL.md`.
+- [x] Produce `BACKUP_ARCHITECTURE_PROPOSAL.md`.
+- [x] Produce `BACKUP_RISK_REGISTER.md`.
+- [x] Produce `BACKUP_PHASE_A_REPORT.md`.
+- [ ] **Owner decision:** 2 vs 3 SSD generations (and 20 % reserve exception).
+- [ ] **Owner decision:** HDD quota 220–240 GiB or transient one-generation copy.
+- [ ] **Owner decision:** SSD carve-out size / future `fast-data` trade-off.
+- [ ] **Owner decision:** application-aware Immich/Docker backup and CT104 bind-mount coverage.
+- [ ] **Owner decision:** encryption key custody for host configuration.
+- [ ] **Owner decision:** restore-drill target (new VMID/isolated bridge).
+- [ ] **Owner decision:** old 12 archives deletion (Scope A or A+B) — still not authorized.
+- [ ] Phase B storage design — not started.

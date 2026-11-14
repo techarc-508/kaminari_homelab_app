@@ -81,3 +81,73 @@ Append-only record of owner decisions and the technical choices that follow from
 | D-15 | Release APK is signed with a test-only key, not a production key. | Owner instruction; production key remains a separate decision. |
 | D-16 | Do not deploy a new CT/VM or expose the gateway publicly. | Owner boundary; no always-on private host chosen yet. |
 | D-17 | Keep `KAMINARI-FUJI-Homelab` read-only; use `kaminari-onboarding-test` for tests. | Production alerts must not be polluted. |
+
+## Ntfy redesign decisions (2026-11-12)
+
+| ID | Decision | Reason |
+|---|---|---|
+| D-18 | All new notification topics use the `kf-` prefix; **22 approved topics** and **no `kf-builds`**. | Owner-approved redesign; catalogue is locked in `APPROVED_KF_TOPIC_CATALOGUE.md`. |
+| D-19 | `kfadmin` is the only ntfy administrator; `kaminari_app` is a normal ntfy user and the gateway/application owner. | Separates ntfy administration from application authority; no admin token in Android. |
+| D-20 | The gateway uses a separate token under `kaminari_app`; Android and gateway tokens are distinct and revocable. | Token isolation and independent revocation. |
+| D-21 | Preserve `KAMINARI-FUJI-Homelab`, `kaminari-diary` and `kaminari-onboarding-test` until every producer/subscriber is migrated. | No silent deletion of production history. |
+| D-22 | Stage 1 does **not** delete the old backup archives; deletion requires exact owner confirmation of the manifest. | The old archives are the only recent recovery points for CT104/VM200 and the HDD is at-risk. |
+| D-23 | Level 4 administration is approved, including destructive operations, but only through typed gateway operations with preview, exact target, step-up and audit. | Owner-approved full control plane without arbitrary shell or PVE root credentials. |
+| D-24 | PVE backup notification body is reduced to `{{ title }}`; the full task log stays in PVE. | ntfy rejects bodies above 4,095 bytes; the old body caused HTTP 400. |
+
+## Freebuff Workstream B — Phase 0 findings (2026-11-12)
+
+These are **findings**, not owner approvals. D-18…D-24 remain the locked decisions.
+
+| ID | Finding | Consequence |
+|---|---|---|
+| TB0-01 | ntfy ACLs are granted per **user**, not per token. Two tokens under `kaminari_app` inherit identical permissions. | The approved Android/gateway split cannot be implemented as written without a new identity or a combined-ACL decision (P-02). |
+| TB0-02 | The live server has authentication disabled and a memory-only message cache. | `kf-admin-audit` cannot be the audit system of record; a durable local store is required (P-05). |
+| TB0-03 | The gateway's mutation approval token is the client-supplied nonce. | This is not step-up authentication; mutations must remain disabled until P-06 is implemented. |
+| TB0-04 | The Android command catalogue and the gateway catalogue share only two action IDs; the reply topic constant is `rplab-command-results`. | Real command execution cannot work until both are reconciled. |
+| TB0-05 | None of the 22 `kf-` topics exists, and no production code references one. | Phase 1 is contract/model work only; topic creation stays in Phase 5. |
+| TB0-06 | The Android app seeds **no** topics and its sample topic names are not live. | Migration must explicitly seed the approved catalogue; the app will not receive the legacy stream by default. |
+| TB0-07 | No web frontend exists in the repository. | The web console is blocked on the gateway contract, not on frontend work. |
+| TB0-08 | The live `nfty.rplab.qzz.io` host still returns 502; `ntfy.rplab.qzz.io` is canonical. | Any stale client config must be corrected before migration. |
+
+### Pending owner decisions (not approved)
+
+| ID | Decision needed |
+|---|---|
+| P-01 | Confirm `kf-` supersedes `rplab-` in all documents, including the discovery set and priority standard. |
+| P-02 | Resolve the Android/gateway token split: combined `kaminari_app` ACLs, a new `kf_gateway` identity, or gateway-owned result/audit topics. |
+| P-03 | Decide whether `NtfyAdminClient` may remain in the APK (currently unwired but admin-capable). |
+| P-04 | Choose the gateway deployment host and TLS path, or explicitly keep the command centre mock-only. |
+| P-05 | Approve a durable local audit store in addition to `kf-admin-audit`. |
+| P-06 | Approve a real step-up reauthentication design and retire nonce-echo approval. |
+| P-07 | Resolve `kf-diary` write ownership between the ACL matrix and the stickers contract. |
+| P-08 | Decide whether `kf-iot` is created denied or deferred until a producer exists. |
+| P-09 | Confirm `kaminari_app` access to the legacy test topic for migration testing. |
+
+## Backup Workstream A — Phase A decisions (2026-11-12)
+
+| ID | Decision | Reason |
+|---|---|---|
+| D-25 | SSD primary is the existing `nvme0n1` **XPG GAMMIX S11 Pro**; HDD secondary is the existing `sda` **ST500DM002**. | Owner-approved architecture; no new hardware or VM/CT. |
+| D-26 | The SSD must be used through a new thin LV on the existing `fast-data-ssd` pool, not by formatting or repartitioning the device. | The device is already an active PVE `lvmthin` store. |
+| D-27 | The HDD is secondary only; it is not disaster recovery because it is the same physical pool as downloads, Immich and a VM disk. | `zpool`/`zfs` evidence. |
+| D-28 | Three SSD generations are **not approved** as a silent default; two are recommended until capacity or reserve is approved. | 3 × 66.6 GiB = 199.8 GiB on ~235 GiB usable; ~15 % free. |
+| D-29 | HDD safe copy order requires a 220–240 GiB quota or an explicitly accepted transient one-generation state. | 2 old + new = 199.8 GiB > 150 GiB quota. |
+| D-30 | CT104 bind mounts (`backup=0`) and Immich/Docker databases require separate application-aware coverage. | The CT104 archive is rootfs-only. |
+| D-31 | Host configuration backups must be encrypted; the key must not be stored on the backup devices. | `/etc/pve/priv` and service credentials are sensitive. |
+
+## Freebuff Workstream B — Phase 1 decisions (2026-11-12)
+
+| ID | Decision | Source / rationale |
+|---|---|---|
+| D-32 | **P-01 locked:** `kf-` is canonical; exactly **22 topics**; `kf-builds` is excluded. | Owner Phase 1 authorisation. |
+| D-33 | **P-02 locked:** a separate non-admin **`kf_gateway`** identity. This supersedes the D-19/D-20 wording that placed the gateway token under `kaminari_app`. | Owner Phase 1 authorisation; ntfy ACLs are per user. |
+| D-34 | **P-03 locked:** **Option B** — full Android administration UI backed by the secure gateway. No admin credential or privileged direct execution in the APK. | Owner Phase 1 authorisation. |
+| D-35 | `contracts/kf_contract.v1.json` is the single cross-language source of truth; Kotlin and Python must test against it. | Prevents client/gateway drift. |
+| D-36 | The wire `requires_confirmation` field is true for every mutation; L1/L2 `ownerConfirmation` is additional UI metadata. | Both runtimes already enforced mutation confirmation; the wire rule is now explicit. |
+| D-37 | ntfy `write` does not imply `read`, in both contract implementations. | Matches ntfy write-only grants; avoids encoding an escalation. |
+| D-38 | Room v3 adds `category`/`priority` with defaults `OTHER`/`3` and explicit `MIGRATION_2_3`; no destructive fallback. | User history must survive upgrades. |
+| D-39 | `kf-command-result` is the canonical command reply topic; `rplab-command-results` is accepted only for staged correlation. | Aligns with P-01 while preserving migration. |
+| D-40 | `NtfyAdminClient` moves to test sources as `NtfyAdminFixture`; production `src/main` must contain no admin ntfy call. | P-03 applied without discarding the test harness. |
+| D-41 | `UnavailableGatewayAdminService` is the production default; every admin capability is `PLANNED`, `GATEWAY_REQUIRED` or `UNAVAILABLE`. | No fake success and no privileged local execution. |
+| D-42 | Gateway audit and idempotency remain in memory in Phase 1 and expose `durable = False`; nonce echo reports `is_step_up = False`. | Honest Phase 1 boundary; P-05/P-06 remain required before mutations. |
+| D-43 | Phase 1 does not seed topics, deploy the gateway or change live identities/ACLs/topics. | Phase scope and production-safety rules. |

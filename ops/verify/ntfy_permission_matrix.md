@@ -4,7 +4,8 @@ Apply with `ops/ntfy/generate_auth.py --apply`; verify with `ops/verify/ntfy_mat
 
 | Identity | Role | Topic permissions |
 |---|---|---|
-| `kaminari_app` | user | `kf-admin-audit` ro, `kf-backups` ro, `kf-command-request` wo, `kf-command-result` ro, `kf-diary` ro, `kf-digest` ro, `kf-iot` ro, `kf-music-pipeline` ro, `kf-music-reports` ro, `kf-network` ro, `kf-news-reports` ro, `kf-news` ro, `kf-ntfy` ro, `kf-pve-ct` ro, `kf-pve-host` ro, `kf-pve-vm` ro, `kf-security` ro, `kf-services` ro, `kf-stickers-pipeline` ro, `kf-stickers-reports` ro, `kf-storage` ro, `kf-web` ro |
+| `kaminari_app` | user | `KAMINARI-FUJI-Homelab` ro, `kaminari-diary` ro, `kf-admin-audit` ro, `kf-backups` ro, `kf-command-request` wo, `kf-command-result` ro, `kf-diary` ro, `kf-digest` ro, `kf-iot` ro, `kf-music-pipeline` ro, `kf-music-reports` ro, `kf-network` ro, `kf-news-reports` ro, `kf-news` ro, `kf-ntfy` ro, `kf-pve-ct` ro, `kf-pve-host` ro, `kf-pve-vm` ro, `kf-security` ro, `kf-services` ro, `kf-stickers-pipeline` ro, `kf-stickers-reports` ro, `kf-storage` ro, `kf-web` ro |
+| `kf_dashboard` | user | `KAMINARI-FUJI-Homelab` rw |
 | `kf_gateway` | user | `kf-admin-audit` wo, `kf-command-request` ro, `kf-command-result` wo |
 | `kf_monitor` | user | `kf-backups` wo, `kf-digest` wo, `kf-network` wo, `kf-ntfy` wo, `kf-pve-ct` wo, `kf-pve-host` wo, `kf-pve-vm` wo, `kf-security` wo, `kf-services` wo, `kf-storage` wo, `kf-web` wo |
 | `kf_music` | user | `kf-music-pipeline` wo, `kf-music-reports` wo |

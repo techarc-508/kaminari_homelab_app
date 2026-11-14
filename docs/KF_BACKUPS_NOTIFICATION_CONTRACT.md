@@ -14,7 +14,7 @@ the other being told.
 | Readers | `kaminari_app` (the phone), `kfadmin` (admin) |
 | Anonymous access | **none** — `*` has no rule for this topic |
 | Retention / priority | `normal`, schema `kf.infrastructure.v1` |
-| Current state | topic exists, publisher works, **no producer is wired yet** |
+| Current state | topic exists, publisher works, **no producer is wired yet** (see `docs/KF_BACKUPS_PUBLISHER_HANDOFF.md` for the install + call recipe) |
 
 Token: `kf_monitor` in `/opt/kaminari-ntfy/credentials.env`. Never in a report,
 a commit, a chat message or a backup log.

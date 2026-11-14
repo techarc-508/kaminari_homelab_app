@@ -46,6 +46,10 @@ def desired_state(contract: dict) -> tuple[dict[str, str], list[tuple[str, str, 
     roles: dict[str, str] = {}
     for identity in contract["identities"]:
         roles[identity["name"]] = "admin" if identity.get("ntfyAdmin") else "user"
+    # Legacy-only publishers (the dashboard) are real ntfy users but deliberately
+    # not app identities, so they live outside `identities` and never reach the APK.
+    for identity in contract.get("legacyIdentities", []):
+        roles[identity["name"]] = "admin" if identity.get("ntfyAdmin") else "user"
 
     access: list[tuple[str, str, int, int]] = []
 
@@ -53,6 +57,12 @@ def desired_state(contract: dict) -> tuple[dict[str, str], list[tuple[str, str, 
     for topic in contract["legacyTopics"]:
         if topic.get("anonymous"):
             access.append((ANONYMOUS_USER, topic["id"], 1, 1))
+        # Explicit legacy grants let a named producer/consumer work while `*`
+        # is still in place, so removing `*` later is a measured step.
+        for writer in topic.get("writers", []):
+            access.append((writer, topic["id"], 0, 1))
+        for reader in topic.get("readers", []):
+            access.append((reader, topic["id"], 1, 0))
 
     admins = {name for name, role in roles.items() if role == "admin"}
     for topic in contract["topics"]:

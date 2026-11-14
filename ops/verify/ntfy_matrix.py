@@ -89,7 +89,10 @@ check("app_read_infra", 200, read("kf-pve-host", app)[0])
 check("app_read_music", 200, read("kf-music-pipeline", app)[0])
 check("app_pub_command_request", 200, pub("kf-command-request", app)[0])
 check("app_pub_infra_denied", 403, pub("kf-pve-host", app)[0])
-check("app_pub_legacy_everyone_rule", 200, pub("kaminari-diary", app)[0])  # everyone rule covers all visitors
+# Since the dashboard migration the app has an explicit read-only legacy grant, which
+# overrides the anonymous `*` row for this identity (ntfy prefers the specific row).
+check("app_read_legacy_homelab", 200, read("KAMINARI-FUJI-Homelab", app)[0])
+check("app_pub_legacy_denied_by_specific_grant", 403, pub("kaminari-diary", app)[0])
 check("app_read_command_result", 200, read("kf-command-result", app)[0])
 check("app_pub_command_result_denied", 403, pub("kf-command-result", app)[0])
 
@@ -99,6 +102,13 @@ check("gateway_read_commands", 200, read("kf-command-request", gw)[0])
 check("gateway_pub_result", 200, pub("kf-command-result", gw)[0])
 check("gateway_pub_audit", 200, pub("kf-admin-audit", gw)[0])
 check("gateway_pub_infra_denied", 403, pub("kf-pve-host", gw)[0])
+
+# kf_dashboard (legacy publisher; the identity that replaces anonymous `*`)
+db = tokens["kf_dashboard"]
+check("dashboard_pub_legacy_homelab", 200, pub("KAMINARI-FUJI-Homelab", db)[0])
+check("dashboard_read_legacy_homelab", 200, read("KAMINARI-FUJI-Homelab", db)[0])
+check("dashboard_pub_infra_denied", 403, pub("kf-pve-host", db)[0])
+check("dashboard_read_music_denied", 403, read("kf-music-pipeline", db)[0])
 
 # kfadmin
 ad = tokens["kfadmin"]

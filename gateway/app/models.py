@@ -1,40 +1,14 @@
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
+
 from pydantic import BaseModel, Field
 
 
-class ErrorResponse(BaseModel):
-    error: str
-    code: str = "invalid_request"
-
-
-class NodeSummary(BaseModel):
-    node: str
-    status: str
-    cpu: Optional[float] = None
-    maxcpu: Optional[int] = None
-    mem: Optional[int] = None
-    maxmem: Optional[int] = None
-
-
-class VmSummary(BaseModel):
-    vmid: int
-    name: str
-    status: str
-    node: str
-    type: str = "qemu"
-
-
-class StorageSummary(BaseModel):
-    storage: str
-    type: str
-    content: Optional[str] = None
-    total: Optional[int] = None
-    used: Optional[int] = None
-    avail: Optional[int] = None
-
-
 class CommandEnvelopeIn(BaseModel):
-    schema: str = Field(alias="schema")
+    """Typed command envelope. Unknown fields are rejected outright."""
+
+    model_config = {"populate_by_name": True, "extra": "forbid"}
+
+    schema_: str = Field(alias="schema")
     command_id: str
     nonce: str
     issued_at: str
@@ -46,12 +20,19 @@ class CommandEnvelopeIn(BaseModel):
     reply_topic: str
     requires_confirmation: bool
 
-    model_config = {"populate_by_name": True}
+
+class StepUpApproval(BaseModel):
+    model_config = {"extra": "forbid"}
+
+    challenge_id: str
+    code: str
 
 
 class CommandExecuteRequest(BaseModel):
+    model_config = {"extra": "forbid"}
+
     envelope: CommandEnvelopeIn
-    approval_token: Optional[str] = None
+    approval: Optional[StepUpApproval] = None
 
 
 class CommandResultOut(BaseModel):
@@ -62,7 +43,50 @@ class CommandResultOut(BaseModel):
     task_id: Optional[str] = None
 
 
+class StepUpChallengeRequest(BaseModel):
+    model_config = {"extra": "forbid"}
+
+    command_id: str
+    action: str
+    target: str
+    args: Dict[str, str] = Field(default_factory=dict)
+
+
+class StepUpConfirmRequest(BaseModel):
+    model_config = {"extra": "forbid"}
+
+    code: str
+
+
+class StepUpEnrollResponse(BaseModel):
+    secret: str
+    otpauth_uri: str
+    requires_confirmation: bool = True
+    digits: int = 6
+    period_seconds: int = 30
+
+
+class StepUpStatusResponse(BaseModel):
+    enrolled: bool
+    pending_enrollment: bool
+    step_up: bool
+    challenge_ttl_seconds: int
+    mutations_enabled: bool
+
+
+class StepUpChallengeResponse(BaseModel):
+    challenge_id: str
+    request_id: str
+    action: str
+    target: str
+    expires_at: str
+
+
 class CommandExecuteResponse(BaseModel):
     status: str
     result: CommandResultOut
     expired: bool = False
+    replayed: bool = False
+    correlation_id: Optional[str] = None
+    audit_id: str
+    identity: str

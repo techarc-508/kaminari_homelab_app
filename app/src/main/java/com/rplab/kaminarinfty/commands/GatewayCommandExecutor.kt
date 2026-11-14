@@ -46,17 +46,18 @@ class GatewayCommandExecutor(
             return failure("Gateway token is not configured")
         }
 
-        val approvalToken = if (envelope.requiresConfirmation && confirmedAt != null) {
-            envelope.nonce
-        } else {
-            null
+        // Gateway mutations require server-verified TOTP step-up bound to this
+        // exact command. This build has no step-up challenge UI, so sending a
+        // nonce echo (or any self-asserted approval) would be rejected by the
+        // gateway. Refuse locally instead of pretending the mutation worked.
+        if (envelope.requiresConfirmation) {
+            return failure(
+                "Step-up approval is required for mutations and is not available in this build",
+            )
         }
 
         val bodyJson = JSONObject()
             .put("envelope", JSONObject(envelope.toJson()))
-        if (approvalToken != null) {
-            bodyJson.put("approval_token", approvalToken)
-        }
 
         val request = Request.Builder()
             .url("$normalizedBase/v1/commands/execute")

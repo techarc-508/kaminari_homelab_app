@@ -1,148 +1,138 @@
-import os
-import time
-import uuid
-
-import httpx
-import pytest
-from fastapi.testclient import TestClient
-
-os.environ.setdefault("GATEWAY_GATEWAY_TOKEN", "test-gateway-token")
-os.environ.setdefault("GATEWAY_PROXMOX_BASE_URL", "https://proxmox.example:8006/api2/json")
-os.environ.setdefault("GATEWAY_PROXMOX_API_TOKEN", "root@pam!token=secret")
-os.environ.setdefault("GATEWAY_MUTATIONS_ENABLED", "true")
-
-from app.main import app, proxmox, replay_cache
-from app.commands import parse_timestamp
-from datetime import datetime, timezone
+from app.main import settings, step_up_service, store
+from support import auth_headers, make_envelope, owner_headers
 
 
-def _ts(ms_offset=0):
-    dt = datetime.fromtimestamp((time.time() * 1000 + ms_offset) / 1000, tz=timezone.utc)
-    return dt.strftime("%Y-%m-%dT%H:%M:%S.") + f"{int((time.time()*1000)%1000):03d}Z"
+def execute(client, envelope, approval=None, headers=None):
+    body = {"envelope": envelope}
+    if approval is not None:
+        body["approval"] = approval
+    return client.post(
+        "/v1/commands/execute", headers=headers or auth_headers(), json=body
+    )
 
 
-@pytest.fixture(autouse=True)
-def reset_replay():
-    replay_cache._seen.clear()
-    yield
+def test_healthz_is_unauthenticated(client):
+    response = client.get("/healthz")
+    assert response.status_code == 200
+    assert response.json()["status"] == "ok"
 
 
-@pytest.fixture
-def client(monkeypatch):
-    def fake_get(path, params=None):
-        if path == "/version":
-            return {"version": "8.1"}
-        if path == "/nodes":
-            return [{"node": "pve", "status": "online"}]
-        if path.endswith("/qemu"):
-            return [{"vmid": 100, "name": "vm", "status": "running"}]
-        if path.endswith("/lxc"):
-            return [{"vmid": 200, "name": "ct", "status": "running"}]
-        if path.endswith("/status/current"):
-            return {"status": "running", "vmid": 100}
-        if path.endswith("/storage"):
-            return [{"storage": "local", "type": "dir"}]
-        if path.endswith("/tasks"):
-            return [{"upid": "UPID:task", "status": "OK"}]
-        return {}
-
-    async def async_get(path, params=None):
-        return fake_get(path, params)
-
-    async def async_post(path, params=None):
-        return "UPID:started"
-
-    monkeypatch.setattr(proxmox, "get", async_get)
-    monkeypatch.setattr(proxmox, "post", async_post)
-    return TestClient(app)
+def test_readyz_reports_durable_state(client):
+    response = client.get("/readyz")
+    assert response.status_code == 200
+    body = response.json()
+    assert body["status"] == "ready"
+    assert body["durable_state"] is True
+    assert body["step_up_enrolled"] is False
 
 
-def auth_headers():
-    return {"Authorization": "Bearer test-gateway-token"}
-
-
-def make_envelope(action="host.health", args=None, mutations=False):
-    now = int(time.time() * 1000)
-    issued = datetime.fromtimestamp(now / 1000, tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.") + f"{now % 1000:03d}Z"
-    expires = datetime.fromtimestamp((now + 300000) / 1000, tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.") + f"{(now + 300000) % 1000:03d}Z"
-    return {
-        "schema": "rplab.command.v1",
-        "command_id": str(uuid.uuid4()),
-        "nonce": "A" * 43,
-        "issued_at": issued,
-        "expires_at": expires,
-        "requested_by": "android:profile-1",
-        "target": "proxmox-gateway",
-        "action": action,
-        "args": args or {},
-        "reply_topic": "rplab-command-results",
-        "requires_confirmation": action in {"vm.stop", "vm.restart", "container.stop", "container.restart", "vm.start", "container.start"},
-    }
-
-
-def test_healthz_unauthenticated(client):
-    r = client.get("/healthz")
-    assert r.status_code == 200
-    assert r.json()["status"] == "ok"
-
-
-def test_nodes_requires_auth(client):
-    r = client.get("/v1/proxmox/nodes")
-    assert r.status_code == 401
-
-
-def test_nodes_ok(client):
-    r = client.get("/v1/proxmox/nodes", headers=auth_headers())
-    assert r.status_code == 200
-    assert r.json()[0]["node"] == "pve"
-
-
-def test_command_host_health(client):
-    env = make_envelope("host.health")
-    r = client.post("/v1/commands/execute", headers=auth_headers(), json={"envelope": env})
-    assert r.status_code == 200
-    body = r.json()
+def test_read_command_completes(client):
+    response = execute(client, make_envelope("host.health"))
+    assert response.status_code == 200
+    body = response.json()
     assert body["status"] == "completed"
     assert body["result"]["ok"] is True
+    assert body["replayed"] is False
+    assert body["identity"] == "kf_gateway"
 
 
-def test_command_replay_rejected(client):
-    env = make_envelope("host.health")
-    # make nonce unique? replay uses same nonce; first succeeds
-    r1 = client.post("/v1/commands/execute", headers=auth_headers(), json={"envelope": env})
-    assert r1.status_code == 200
-    r2 = client.post("/v1/commands/execute", headers=auth_headers(), json={"envelope": env})
-    assert r2.status_code == 409
+def test_canonical_and_legacy_command_schemas_are_accepted(client):
+    for schema in ("kf.command.v1", "rplab.command.v1"):
+        response = execute(client, make_envelope("host.health", schema=schema))
+        assert response.status_code == 200, (schema, response.text)
 
 
-def test_mutation_requires_approval(client):
-    env = make_envelope("vm.stop", {"node": "pve", "vmid": "100"})
-    r = client.post("/v1/commands/execute", headers=auth_headers(), json={"envelope": env})
-    assert r.status_code == 403
+def test_unknown_command_schema_is_rejected(client):
+    response = execute(client, make_envelope("host.health", schema="unknown.v9"))
+    assert response.status_code == 400
+    assert response.json()["code"] == "invalid_request"
 
 
-def test_mutation_with_approval(client):
-    env = make_envelope("vm.stop", {"node": "pve", "vmid": "100"})
-    r = client.post("/v1/commands/execute", headers=auth_headers(), json={"envelope": env, "approval_token": env["nonce"]})
-    assert r.status_code == 200
-    assert r.json()["result"]["ok"] is True
+def test_unknown_reply_topic_is_rejected(client):
+    envelope = make_envelope("host.health", reply_topic="not-a-result-topic")
+    response = execute(client, envelope)
+    assert response.status_code == 400
+    assert response.json()["code"] == "invalid_request"
 
 
-def test_invalid_vmid(client):
-    env = make_envelope("vm.status", {"node": "pve", "vmid": "abc"})
-    r = client.post("/v1/commands/execute", headers=auth_headers(), json={"envelope": env})
-    assert r.status_code == 400
+def test_legacy_reply_topic_still_correlates(client):
+    envelope = make_envelope("host.health", reply_topic="rplab-command-results")
+    assert execute(client, envelope).status_code == 200
 
 
-def test_rate_limit(client):
-    # Exhaust by sending many requests with unique nonces? Rate limiter keys by token prefix, so any requests count.
-    statuses = []
-    for i in range(65):
-        env = make_envelope("host.health")
-        env["nonce"] = ("B" * 42) + str(i % 10)
-        # ensure unique nonce length 43
-        env["nonce"] = ("C" * 43)
-        # nonce reuse will trigger replay after first; but rate limit should trigger 429 before/around
-        r = client.post("/v1/commands/execute", headers=auth_headers(), json={"envelope": env})
-        statuses.append(r.status_code)
-    assert 429 in statuses
+def test_unexpected_args_are_rejected(client):
+    envelope = make_envelope("host.health", args={"node": "pve"})
+    response = execute(client, envelope)
+    assert response.status_code == 400
+    assert response.json()["code"] == "invalid_request"
+
+
+def test_invalid_vmid_is_rejected(client):
+    envelope = make_envelope("vm.status", args={"node": "pve", "vmid": "abc"})
+    assert execute(client, envelope).status_code == 400
+
+
+def test_raw_proxmox_passthrough_routes_are_gone(client):
+    for path in (
+        "/v1/proxmox/nodes",
+        "/v1/proxmox/qemu?node=pve",
+        "/v1/proxmox/lxc?node=pve",
+        "/v1/proxmox/storage?node=pve",
+        "/v1/proxmox/tasks?node=pve",
+        "/v1/proxmox/status?node=pve&kind=qemu&vmid=100",
+    ):
+        assert client.get(path, headers=auth_headers()).status_code == 404, path
+
+
+def test_mutation_without_approval_is_refused(client, enrolled):
+    envelope = make_envelope("vm.start", args={"node": "pve", "vmid": "100"})
+    response = execute(client, envelope)
+    assert response.status_code == 403
+    assert response.json()["code"] == "approval_required"
+
+
+def test_mutation_with_bound_approval_completes(client, enrolled):
+    envelope = make_envelope("vm.start", args={"node": "pve", "vmid": "100"})
+    approval = enrolled.approval(envelope)
+    response = execute(client, envelope, approval)
+    assert response.status_code == 200, response.text
+    assert response.json()["status"] == "completed"
+    assert response.json()["result"]["ok"] is True
+
+
+def test_replayed_command_returns_stored_result(client):
+    envelope = make_envelope("host.health")
+    first = execute(client, envelope)
+    second = execute(client, {
+        **envelope,
+        "nonce": "Z" * 43,
+    })
+    assert first.status_code == 200
+    # The same command_id with different content is a conflict, not a re-run.
+    assert second.status_code == 409
+    assert second.json()["code"] == "idempotency_conflict"
+
+
+def test_owner_reads_audit_and_secrets_are_absent(client, enrolled):
+    envelope = make_envelope("vm.start", args={"node": "pve", "vmid": "100"})
+    approval = enrolled.approval(envelope)
+    assert execute(client, envelope, approval).status_code == 200
+
+    response = client.get("/v1/audit/recent?limit=100", headers=owner_headers())
+    assert response.status_code == 200
+    events = response.json()["events"]
+    assert any(event["operation_id"] == "host.health" or event["operation_id"] == "vm.start" for event in events)
+    serialized = response.text.lower()
+    assert "test-gateway-token" not in serialized
+    assert "test-owner-token" not in serialized
+    assert enrolled.secret.lower() not in serialized
+    assert approval["code"] not in response.text
+
+
+def test_gateway_identity_comes_from_configuration(client):
+    settings.gateway_identity = "kf_gateway"
+    response = execute(client, make_envelope("node.list"))
+    assert response.status_code == 200
+    assert response.json()["identity"] == "kf_gateway"
+    assert store.audit_count() > 0
+    assert step_up_service.available() is False

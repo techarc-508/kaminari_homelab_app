@@ -1,0 +1,60 @@
+# Kaminari gateway — CT104 deployment unit.
+#
+# No `ports:` section on purpose: the gateway is reachable only from other
+# containers/hosts on the compose network or through an authenticated reverse
+# proxy. Never publish 8080 to the internet.
+#
+#   docker compose -p kaminari-gateway -f gateway/deploy/docker-compose.yml up -d --build
+name: kaminari-gateway
+
+services:
+  gateway:
+    build:
+      context: ../..
+      dockerfile: gateway/Dockerfile
+    image: kaminari-gateway:2.0.0
+    container_name: kaminari-gateway
+    restart: unless-stopped
+    env_file:
+      - ../.env
+    environment:
+      GATEWAY_DB_PATH: /data/kaminari-gateway.db
+    volumes:
+      - kaminari-gateway-data:/data
+    networks:
+      - kaminari-gateway-net
+    expose:
+      - "8080"
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    mem_limit: 256m
+    cpus: 1.0
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import sys,urllib.request; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8080/healthz', timeout=3).status == 200 else 1)"
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+volumes:
+  kaminari-gateway-data:
+    name: kaminari-gateway-data
+
+networks:
+  kaminari-gateway-net:
+    name: kaminari-gateway-net
+    driver: bridge

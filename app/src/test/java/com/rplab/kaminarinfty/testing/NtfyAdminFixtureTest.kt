@@ -1,4 +1,4 @@
-package com.rplab.kaminarinfty.data.api
+package com.rplab.kaminarinfty.testing
 
 import org.junit.Assert.assertTrue
 import org.junit.Assert.assertEquals
@@ -14,7 +14,7 @@ import org.robolectric.annotation.Config
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
-class NtfyAdminClientTest {
+class NtfyAdminFixtureTest {
 
     private val server = MockWebServer()
 
@@ -30,7 +30,7 @@ class NtfyAdminClientTest {
             .put(JSONObject().put("username", "alice").put("role", "user").put("grants", JSONArray()))
         server.enqueue(MockResponse().setResponseCode(200).setBody(users.toString()))
 
-        val client = NtfyAdminClient(baseUrl = server.url("/").toString().trimEnd('/'), requireHttps = false)
+        val client = NtfyAdminFixture(baseUrl = server.url("/").toString().trimEnd('/'), requireHttps = false)
         val result = client.listUsers("admin", "secret")
         assertTrue(result.isSuccess)
         assertEquals("alice", result.getOrNull()?.first()?.username)
@@ -41,7 +41,7 @@ class NtfyAdminClientTest {
         server.start()
         server.enqueue(MockResponse().setResponseCode(200).setBody("{\"success\":true}"))
 
-        val client = NtfyAdminClient(baseUrl = server.url("/").toString().trimEnd('/'), requireHttps = false)
+        val client = NtfyAdminFixture(baseUrl = server.url("/").toString().trimEnd('/'), requireHttps = false)
         val result = client.createUser("bob", "password", "admin", "secret")
         assertTrue(result.isSuccess)
         val request = server.takeRequest()
@@ -54,7 +54,7 @@ class NtfyAdminClientTest {
         server.start()
         server.enqueue(MockResponse().setResponseCode(200).setBody("{\"success\":true}"))
 
-        val client = NtfyAdminClient(baseUrl = server.url("/").toString().trimEnd('/'), requireHttps = false)
+        val client = NtfyAdminFixture(baseUrl = server.url("/").toString().trimEnd('/'), requireHttps = false)
         val result = client.grantAccess("bob", "alerts", "read-write", "admin", "secret")
         assertTrue(result.isSuccess)
         val request = server.takeRequest()
@@ -66,7 +66,7 @@ class NtfyAdminClientTest {
         server.start()
         server.enqueue(MockResponse().setResponseCode(401).setBody("{\"error\":\"unauthorized\"}"))
 
-        val client = NtfyAdminClient(baseUrl = server.url("/").toString().trimEnd('/'), requireHttps = false)
+        val client = NtfyAdminFixture(baseUrl = server.url("/").toString().trimEnd('/'), requireHttps = false)
         val result = client.listUsers("admin", "wrong")
         assertTrue(result.isFailure)
     }
@@ -76,14 +76,14 @@ class NtfyAdminClientTest {
         server.start()
         server.enqueue(MockResponse().setResponseCode(500).setBody("internal failure"))
 
-        val client = NtfyAdminClient(baseUrl = server.url("/").toString().trimEnd('/'), requireHttps = false)
+        val client = NtfyAdminFixture(baseUrl = server.url("/").toString().trimEnd('/'), requireHttps = false)
         val result = client.listUsers("admin", "secret")
         assertTrue(result.isFailure)
     }
 
     @Test
     fun requiresHttpsByDefault() {
-        val client = NtfyAdminClient(baseUrl = "http://example.com", requireHttps = true)
+        val client = NtfyAdminFixture(baseUrl = "http://example.com", requireHttps = true)
         val result = client.listUsers("admin", "secret")
         assertTrue(result.isFailure)
         assertTrue(result.exceptionOrNull()?.message?.contains("HTTPS") == true)
@@ -94,7 +94,7 @@ class NtfyAdminClientTest {
         server.start()
         server.enqueue(MockResponse().setResponseCode(404).setBody("not found"))
 
-        val client = NtfyAdminClient(baseUrl = server.url("/").toString().trimEnd('/'), requireHttps = false)
+        val client = NtfyAdminFixture(baseUrl = server.url("/").toString().trimEnd('/'), requireHttps = false)
         // listUsers is the only read path exposed; unsupported operations are not provided by the client.
         val result = client.listUsers("admin", "secret")
         assertTrue(result.isFailure)

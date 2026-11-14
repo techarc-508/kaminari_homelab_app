@@ -1,4 +1,4 @@
-package com.rplab.kaminarinfty.data.api
+package com.rplab.kaminarinfty.testing
 
 import java.io.IOException
 import java.util.concurrent.TimeUnit
@@ -11,12 +11,14 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 /**
- * Thin client for documented ntfy administration endpoints.
+ * TEST-ONLY fixture for documented ntfy administration endpoints.
  *
- * It requires an admin-capable credential and never stores or logs it. The
- * caller is responsible for supplying and protecting that credential.
+ * This class was removed from `src/main` in Phase 1 (P-03): the production APK
+ * must not contain a direct privileged ntfy execution path or accept an admin
+ * credential. It survives here only to keep the HTTP-shape tests meaningful and
+ * must never be moved back into the app source set.
  */
-class NtfyAdminClient(
+class NtfyAdminFixture(
     private val baseUrl: String,
     private val requireHttps: Boolean = true,
     private val client: OkHttpClient = OkHttpClient.Builder()

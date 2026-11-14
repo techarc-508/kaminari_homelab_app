@@ -19,12 +19,13 @@ import org.robolectric.annotation.Config
 import java.io.File
 
 /**
- * Migrates a real v1 database built from the exported 1.json schema, then opens
- * it with Room at v2. Room's own schema validation is the final assertion.
+ * Migrates a real v1 database built from the exported 1.json schema through
+ * v2 to v3, then opens it with Room. Room's own schema validation is the final
+ * assertion, and the v3 defaults are checked explicitly.
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
-class Migration1To2Test {
+class Migration1To3Test {
 
     private val dbName = "migration-1-2-test.db"
     private lateinit var context: Context
@@ -88,22 +89,24 @@ class Migration1To2Test {
 
     private fun openMigrated(): KaminariDatabase =
         Room.databaseBuilder(context, KaminariDatabase::class.java, dbName)
-            .addMigrations(KaminariDatabase.MIGRATION_1_2)
+            .addMigrations(KaminariDatabase.MIGRATION_1_2, KaminariDatabase.MIGRATION_2_3)
             .allowMainThreadQueries()
             .build()
 
     @Test
-    fun `migration preserves v1 rows and creates v2 tables`() = runTest {
+    fun `migration preserves v1 rows and creates v2 and v3 fields`() = runTest {
         seedV1()
         val database = openMigrated()
         try {
-            assertEquals(2, database.openHelper.writableDatabase.version)
+            assertEquals(3, database.openHelper.writableDatabase.version)
             assertEquals("Primary", database.serverProfileDao().getById("primary")!!.displayName)
             val subscription = database.topicSubscriptionDao().getForProfile("primary").single()
             assertEquals("ops", subscription.topic)
             assertTrue(subscription.isSubscribed)
             assertFalse(subscription.isPaused)
             assertNull(subscription.priorityThreshold)
+            assertEquals("OTHER", subscription.category)
+            assertEquals(3, subscription.priority)
             val message = database.messageDao().getById("primary", "m1")!!
             assertEquals("Body", message.body)
             assertFalse(message.isRead)

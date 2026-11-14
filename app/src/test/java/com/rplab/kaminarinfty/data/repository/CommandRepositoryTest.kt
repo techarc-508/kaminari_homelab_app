@@ -75,7 +75,7 @@ class CommandRepositoryTest {
         val parsed = command.result()
         assertNotNull(parsed)
         assertTrue(parsed!!.mock)
-        assertEquals("MOCK: host healthy", command.resultSummary)
+        assertEquals("MOCK: host healthy (simulated)", command.resultSummary)
 
         val events = database.activityDao().observeRecent("primary", 10).first()
         assertTrue(events.any { it.type == ActivityType.COMMAND_SUBMITTED.name })
@@ -87,8 +87,8 @@ class CommandRepositoryTest {
     fun `destructive command waits for exact confirmation`() = runTest {
         val created = repository.create(
             "primary",
-            "service.restart",
-            mapOf("service" to "navidrome"),
+            "container.restart",
+            mapOf("node" to "pve", "vmid" to "200"),
         )
         assertTrue(created is CommandCreateResult.AwaitingConfirmation)
         val pending = (created as CommandCreateResult.AwaitingConfirmation).command
@@ -111,7 +111,11 @@ class CommandRepositoryTest {
 
     @Test
     fun `expired command does not execute`() = runTest {
-        val created = repository.create("primary", "service.restart", mapOf("service" to "navidrome"))
+        val created = repository.create(
+            "primary",
+            "container.restart",
+            mapOf("node" to "pve", "vmid" to "200"),
+        )
         val command = (created as CommandCreateResult.AwaitingConfirmation).command
         clock += TimeUnit.MINUTES.toMillis(6)
 
@@ -123,7 +127,11 @@ class CommandRepositoryTest {
 
     @Test
     fun `command expires at five minute boundary`() = runTest {
-        val created = repository.create("primary", "service.restart", mapOf("service" to "navidrome"))
+        val created = repository.create(
+            "primary",
+            "container.restart",
+            mapOf("node" to "pve", "vmid" to "200"),
+        )
         val command = (created as CommandCreateResult.AwaitingConfirmation).command
         clock = command.expiresAt
 
@@ -161,14 +169,22 @@ class CommandRepositoryTest {
     }
 
     @Test
-    fun `invalid service argument is rejected`() = runTest {
-        val result = repository.create("primary", "service.status", mapOf("service" to "BAD NAME"))
+    fun `invalid guest argument is rejected`() = runTest {
+        val result = repository.create(
+            "primary",
+            "vm.status",
+            mapOf("node" to "PVE ROOT", "vmid" to "100"),
+        )
         assertTrue(result is CommandCreateResult.Rejected)
     }
 
     @Test
     fun `reject pending command records rejected status`() = runTest {
-        val created = repository.create("primary", "service.restart", mapOf("service" to "navidrome"))
+        val created = repository.create(
+            "primary",
+            "container.restart",
+            mapOf("node" to "pve", "vmid" to "200"),
+        )
         val pending = (created as CommandCreateResult.AwaitingConfirmation).command
         val rejected = repository.reject("primary", pending.commandId, pending.nonce)
         assertTrue(rejected is CommandActionResult.Completed)
@@ -178,7 +194,11 @@ class CommandRepositoryTest {
 
     @Test
     fun `confirmation from another profile is rejected`() = runTest {
-        val created = repository.create("primary", "service.restart", mapOf("service" to "navidrome"))
+        val created = repository.create(
+            "primary",
+            "container.restart",
+            mapOf("node" to "pve", "vmid" to "200"),
+        )
         val pending = (created as CommandCreateResult.AwaitingConfirmation).command
         val result = repository.confirmAndExecute("secondary", pending.commandId, pending.nonce)
         assertTrue(result is CommandActionResult.Rejected)
@@ -194,7 +214,11 @@ class CommandRepositoryTest {
 
     @Test
     fun `mock executor never reports real infrastructure changed`() = runTest {
-        val created = repository.create("primary", "container.status", mapOf("container" to "jellyfin"))
+        val created = repository.create(
+            "primary",
+            "container.status",
+            mapOf("node" to "pve", "vmid" to "200"),
+        )
         val command = (created as CommandCreateResult.Completed).command
         val result = command.result()!!
         assertTrue(result.mock)
